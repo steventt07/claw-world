@@ -25,6 +25,10 @@ export interface DemoModeConfig {
   setManagedSessions: (sessions: ManagedSession[]) => void
   setClaudeToManagedLinks: (links: Map<string, string>) => void
   hideOverlay: () => void
+  /** Delete a zone and its session state (for sub-agent cleanup) */
+  deleteZone?: (sessionId: string) => void
+  /** Launch a spawn beam arc from one session's portal to another session's zone */
+  spawnBeam?: (from: string, to: string) => void
 }
 
 // ============================================================================
@@ -32,6 +36,7 @@ export interface DemoModeConfig {
 // ============================================================================
 
 let _isDemoMode = false
+let _isExplicitDemo = false  // Started via ?demo=true URL param (don't auto-stop)
 let _timers: ReturnType<typeof setTimeout>[] = []
 
 // ============================================================================
@@ -43,11 +48,17 @@ export function isDemoMode(): boolean {
   return _isDemoMode
 }
 
+/** Check if demo was explicitly requested (e.g. ?demo=true) and shouldn't auto-stop */
+export function isExplicitDemo(): boolean {
+  return _isExplicitDemo
+}
+
 /** Start demo mode — injects fake sessions and begins event playback */
-export function startDemoMode(config: DemoModeConfig): void {
+export function startDemoMode(config: DemoModeConfig, options?: { explicit?: boolean }): void {
   if (_isDemoMode) return
 
   _isDemoMode = true
+  _isExplicitDemo = options?.explicit ?? false
   _timers = []
 
   // Hide any connection overlay
@@ -93,6 +104,7 @@ export function stopDemoMode(): void {
   document.body.classList.remove('demo-mode')
 
   _isDemoMode = false
+  _isExplicitDemo = false
   console.log('[Demo] Stopped demo mode')
 }
 
@@ -124,6 +136,26 @@ function runScenario(scenario: DemoScenario, config: DemoModeConfig): void {
       } as ClaudeEvent
 
       config.handleEvent(event)
+
+      // Launch spawn beam after a short delay (zone needs to exist first)
+      if (step.spawnBeam && config.spawnBeam) {
+        const { from, to } = step.spawnBeam
+        const beamTimer = setTimeout(() => {
+          if (!_isDemoMode) return
+          config.spawnBeam!(from, to)
+        }, 200)
+        _timers.push(beamTimer)
+      }
+
+      // Delete zone after event fires (sub-agent cleanup)
+      if (step.deleteZone && config.deleteZone) {
+        // Small delay so the stop event renders before zone exits
+        const cleanupTimer = setTimeout(() => {
+          if (!_isDemoMode) return
+          config.deleteZone!(step.deleteZone!)
+        }, 500)
+        _timers.push(cleanupTimer)
+      }
     }, cumulativeDelay)
 
     _timers.push(timer)

@@ -1,1 +1,1 @@
-export { startDemoMode, stopDemoMode, isDemoMode } from './DemoMode'
+export { startDemoMode, stopDemoMode, isDemoMode, isExplicitDemo } from './DemoMode'

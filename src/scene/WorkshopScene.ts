@@ -11,6 +11,7 @@ import type { StationType, TextTile } from '../../shared/types'
 import { HexGrid } from '../utils/HexGrid'
 import { soundManager } from '../audio'
 import { ZoneNotifications, type NotificationOptions } from './ZoneNotifications'
+import { SpawnBeamManager } from './SpawnBeam'
 import { StationPanels } from './StationPanels'
 import { drawMode } from '../ui/DrawMode'
 import {
@@ -183,6 +184,9 @@ export class WorkshopScene {
   // Station info panels
   public stationPanels: StationPanels
 
+  // Spawn beam effects (portal → sub-agent zone arcs)
+  public spawnBeams: SpawnBeamManager
+
   // Ambient floating particles
   private ambientParticles: THREE.Points | null = null
   private ambientParticleData: Array<{
@@ -284,6 +288,9 @@ export class WorkshopScene {
 
     // Initialize station panels
     this.stationPanels = new StationPanels(this.scene)
+
+    // Initialize spawn beam effects
+    this.spawnBeams = new SpawnBeamManager(this.scene)
 
     // Handle resize
     window.addEventListener('resize', this.handleResize)
@@ -646,6 +653,34 @@ export class WorkshopScene {
     const zone = this.zones.get(sessionId)
     if (!zone) return null
     return { x: zone.position.x, z: zone.position.z }
+  }
+
+  /**
+   * Launch a spawn beam arc from one zone's portal station to another zone's center.
+   * Used when the Architect spawns a sub-agent.
+   */
+  launchSpawnBeam(fromSessionId: string, toSessionId: string): void {
+    const fromZone = this.zones.get(fromSessionId)
+    const toZone = this.zones.get(toSessionId)
+    if (!fromZone || !toZone) return
+
+    // Get portal station world position from source zone
+    const portal = fromZone.stations.get('portal')
+    if (!portal) return
+
+    const from = new THREE.Vector3(
+      fromZone.position.x + portal.localPosition.x,
+      fromZone.elevation + 0.5,
+      fromZone.position.z + portal.localPosition.z,
+    )
+
+    const to = new THREE.Vector3(
+      toZone.position.x,
+      toZone.elevation + 0.5,
+      toZone.position.z,
+    )
+
+    this.spawnBeams.launch(from, to, toZone.color)
   }
 
   /**
@@ -2560,6 +2595,9 @@ export class WorkshopScene {
 
       // Update zone notifications (new system)
       this.zoneNotifications.update(delta)
+
+      // Update spawn beam effects
+      this.spawnBeams.update(delta)
 
       // Update station panels
       this.stationPanels.update()

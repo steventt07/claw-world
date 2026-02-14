@@ -60,7 +60,7 @@ import { checkForUpdates } from './ui/VersionChecker'
 import { drawMode } from './ui/DrawMode'
 import { setupTextLabelModal, showTextLabelModal } from './ui/TextLabelModal'
 import { createSessionAPI, type SessionAPI } from './api'
-import { startDemoMode, stopDemoMode, isDemoMode } from './demo'
+import { startDemoMode, stopDemoMode, isDemoMode, isExplicitDemo } from './demo'
 
 // ============================================================================
 // Configuration
@@ -884,6 +884,18 @@ async function deleteZoneBySessionId(zoneId: string): Promise<void> {
 
   // Use existing delete function
   await deleteManagedSession(managedSession.id)
+}
+
+/**
+ * Delete a demo zone — cleans up session state and 3D zone (no server call)
+ */
+function deleteDemoZone(sessionId: string): void {
+  const sessionState = state.sessions.get(sessionId)
+  if (sessionState) {
+    sessionState.claude.dispose()
+    state.sessions.delete(sessionId)
+  }
+  state.scene?.deleteZone(sessionId)
 }
 
 function setupContextMenu(): void {
@@ -2515,6 +2527,8 @@ function setupNotConnectedOverlay(): void {
         for (const [k, v] of links) claudeToManagedLink.set(k, v)
       },
       hideOverlay: hideNotConnectedOverlay,
+      deleteZone: deleteDemoZone,
+      spawnBeam: (from, to) => state.scene?.launchSpawnBeam(from, to),
     })
   })
 
@@ -2661,7 +2675,7 @@ function init() {
     if (connected) {
       hasConnected = true
       hideNotConnectedOverlay()
-      if (isDemoMode()) {
+      if (isDemoMode() && !isExplicitDemo()) {
         stopDemoMode()
       }
     }
@@ -2678,7 +2692,9 @@ function init() {
         for (const [k, v] of links) claudeToManagedLink.set(k, v)
       },
       hideOverlay: hideNotConnectedOverlay,
-    })
+      deleteZone: deleteDemoZone,
+      spawnBeam: (from, to) => state.scene?.launchSpawnBeam(from, to),
+    }, { explicit: true })
   }
 
   // Show not-connected overlay after timeout if never connected (production only)
@@ -2691,10 +2707,17 @@ function init() {
     }, 3000)  // 3 seconds to connect before showing overlay
   }
 
-  state.client.onEvent(handleEvent)
+  state.client.onEvent((event) => {
+    // Don't inject real server events during explicit demo mode
+    if (isExplicitDemo()) return
+    handleEvent(event)
+  })
 
   // Handle history batch - pre-scan for completions before rendering
   state.client.onHistory((events) => {
+    // Don't inject real server events during explicit demo mode
+    if (isExplicitDemo()) return
+
     // First pass: collect all completed tool use IDs (across all sessions)
     for (const event of events) {
       if (event.type === 'post_tool_use') {
