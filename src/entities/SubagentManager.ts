@@ -1,9 +1,11 @@
 /**
  * SubagentManager - Manages subagent visualizations
  *
- * Tracks Task tool spawns and creates mini-Claude instances for each active subagent
+ * Tracks Task tool spawns and creates mini-Claude instances for each active subagent.
+ * Sub-agents use lighter tints of their parent orchestrator's zone color.
  */
 
+import * as THREE from 'three'
 import type { WorkshopScene } from '../scene/WorkshopScene'
 import { Claude, type ClaudeOptions } from './Claude'
 
@@ -15,23 +17,31 @@ export interface Subagent {
   description?: string
 }
 
-// Different colors for subagents to distinguish them
-const SUBAGENT_COLORS = [
-  0x60a5fa, // Blue
-  0x34d399, // Emerald
-  0xf472b6, // Pink
-  0xa78bfa, // Purple
-  0xfbbf24, // Amber
-  0x22d3ee, // Cyan
-]
+/** Lightness steps for successive sub-agents (blend toward white) */
+const TINT_LEVELS = [0.35, 0.5, 0.65, 0.8]
+
+/** Create a lighter tint of a color by blending toward white */
+function lightenColor(baseHex: number, amount: number): number {
+  const base = new THREE.Color(baseHex)
+  const white = new THREE.Color(0xffffff)
+  base.lerp(white, amount)
+  return base.getHex()
+}
 
 export class SubagentManager {
   private scene: WorkshopScene
   private subagents: Map<string, Subagent> = new Map()
-  private colorIndex = 0
+  private spawnIndex = 0
+  private parentColor: number
 
-  constructor(scene: WorkshopScene) {
+  constructor(scene: WorkshopScene, parentColor?: number) {
     this.scene = scene
+    this.parentColor = parentColor ?? 0x4ac8e8 // fallback cyan
+  }
+
+  /** Update parent color (e.g. when zone color is assigned after construction) */
+  setParentColor(color: number): void {
+    this.parentColor = color
   }
 
   /**
@@ -43,9 +53,10 @@ export class SubagentManager {
       return this.subagents.get(toolUseId)!
     }
 
-    // Get next color
-    const color = SUBAGENT_COLORS[this.colorIndex % SUBAGENT_COLORS.length]
-    this.colorIndex++
+    // Lighter tint of parent color for each successive sub-agent
+    const tint = TINT_LEVELS[this.spawnIndex % TINT_LEVELS.length]
+    const color = lightenColor(this.parentColor, tint)
+    this.spawnIndex++
 
     // Create mini-Claude at portal station
     const options: ClaudeOptions = {

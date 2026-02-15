@@ -8,13 +8,8 @@
  */
 
 import type { ClaudeEvent, ManagedSession } from '../../shared/types'
-import {
-  createDemoManagedSessions,
-  createDemoScenarios,
-  DEMO_SESSION_IDS,
-  DEMO_MANAGED_IDS,
-  type DemoScenario,
-} from './scenarios'
+import type { DemoScenario, DemoScenarioType } from './types'
+import { createScenarioBundle } from './scenarios'
 
 // ============================================================================
 // Types
@@ -54,7 +49,10 @@ export function isExplicitDemo(): boolean {
 }
 
 /** Start demo mode — injects fake sessions and begins event playback */
-export function startDemoMode(config: DemoModeConfig, options?: { explicit?: boolean }): void {
+export function startDemoMode(
+  config: DemoModeConfig,
+  options?: { explicit?: boolean; scenarioType?: DemoScenarioType },
+): void {
   if (_isDemoMode) return
 
   _isDemoMode = true
@@ -64,14 +62,17 @@ export function startDemoMode(config: DemoModeConfig, options?: { explicit?: boo
   // Hide any connection overlay
   config.hideOverlay()
 
-  // Create and inject fake managed sessions
-  const sessions = createDemoManagedSessions()
-  config.setManagedSessions(sessions)
+  // Create the scenario bundle for the chosen type (default: swarm)
+  const type = options?.scenarioType ?? 'swarm'
+  const bundle = createScenarioBundle(type)
+
+  // Inject fake managed sessions
+  config.setManagedSessions(bundle.managedSessions)
 
   // Pre-populate claude-to-managed links
   const links = new Map<string, string>()
-  for (let i = 0; i < DEMO_SESSION_IDS.length; i++) {
-    links.set(DEMO_SESSION_IDS[i], DEMO_MANAGED_IDS[i])
+  for (let i = 0; i < bundle.sessionIds.length; i++) {
+    links.set(bundle.sessionIds[i], bundle.managedIds[i])
   }
   config.setClaudeToManagedLinks(links)
 
@@ -79,15 +80,14 @@ export function startDemoMode(config: DemoModeConfig, options?: { explicit?: boo
   document.body.classList.add('demo-mode')
 
   // Start each scenario with staggered timing
-  const scenarios = createDemoScenarios()
-  for (const scenario of scenarios) {
+  for (const scenario of bundle.scenarios) {
     const timer = setTimeout(() => {
       runScenario(scenario, config)
     }, scenario.initialDelay)
     _timers.push(timer)
   }
 
-  console.log('[Demo] Started demo mode with', scenarios.length, 'scenarios')
+  console.log('[Demo] Started demo mode with', bundle.scenarios.length, 'scenarios (type:', type + ')')
 }
 
 /** Stop demo mode — clears all timers and resets state */

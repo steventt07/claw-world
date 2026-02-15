@@ -60,7 +60,7 @@ import { checkForUpdates } from './ui/VersionChecker'
 import { drawMode } from './ui/DrawMode'
 import { setupTextLabelModal, showTextLabelModal } from './ui/TextLabelModal'
 import { createSessionAPI, type SessionAPI } from './api'
-import { startDemoMode, stopDemoMode, isDemoMode, isExplicitDemo } from './demo'
+import { startDemoMode, stopDemoMode, isDemoMode, isExplicitDemo, SCENARIO_META, type DemoScenarioType } from './demo'
 
 // ============================================================================
 // Configuration
@@ -887,7 +887,7 @@ async function deleteZoneBySessionId(zoneId: string): Promise<void> {
 }
 
 /**
- * Delete a demo zone — cleans up session state and 3D zone (no server call)
+ * Delete a demo zone — cleans up session state, managed session, and 3D zone (no server call)
  */
 function deleteDemoZone(sessionId: string): void {
   const sessionState = state.sessions.get(sessionId)
@@ -896,6 +896,17 @@ function deleteDemoZone(sessionId: string): void {
     state.sessions.delete(sessionId)
   }
   state.scene?.deleteZone(sessionId)
+
+  // Also remove the managed session and link so the sidebar updates
+  const managedId = claudeToManagedLink.get(sessionId)
+  if (managedId) {
+    claudeToManagedLink.delete(sessionId)
+    state.managedSessions = state.managedSessions.filter(s => s.id !== managedId)
+    if (state.selectedManagedSession === managedId) {
+      state.selectedManagedSession = null
+    }
+    renderManagedSessions()
+  }
 }
 
 function setupContextMenu(): void {
@@ -1446,8 +1457,8 @@ function getOrCreateSession(sessionId: string): SessionState | null {
     claude.mesh.position.copy(centerStation.position)
   }
 
-  // Create subagent manager
-  const subagents = new SubagentManager(state.scene)
+  // Create subagent manager with parent zone color for tinted sub-agents
+  const subagents = new SubagentManager(state.scene, zone.color)
 
   session = {
     claude,
@@ -2500,13 +2511,88 @@ function setupAboutModal(): void {
 }
 
 // ============================================================================
-// Connection Overlay
+// Connection Overlay & Demo Bar
 // ============================================================================
+
+/** Build the DemoModeConfig needed by startDemoMode — avoids duplication */
+function makeDemoConfig() {
+  return {
+    handleEvent,
+    setManagedSessions: (sessions: ManagedSession[]) => { state.managedSessions = sessions },
+    setClaudeToManagedLinks: (links: Map<string, string>) => {
+      claudeToManagedLink.clear()
+      for (const [k, v] of links) claudeToManagedLink.set(k, v)
+    },
+    hideOverlay: hideNotConnectedOverlay,
+    deleteZone: deleteDemoZone,
+    spawnBeam: (from: string, to: string) => state.scene?.launchSpawnBeam(from, to),
+  }
+}
+
+/** Clean up all demo session state (zones, sessions, links) so a fresh demo can start */
+function cleanupDemoState(): void {
+  // Delete all zones and session state
+  for (const [sessionId, sessionState] of state.sessions) {
+    if (sessionId.startsWith('demo-')) {
+      sessionState.claude.dispose()
+      state.sessions.delete(sessionId)
+      state.scene?.deleteZone(sessionId)
+    }
+  }
+  // Clear managed sessions and links that were demo-related
+  claudeToManagedLink.clear()
+  state.managedSessions = []
+  state.selectedManagedSession = null
+  renderManagedSessions()
+}
+
+/** Switch to a different demo scenario (stop current, clean up, start new) */
+function switchDemoScenario(type: DemoScenarioType): void {
+  stopDemoMode()
+  cleanupDemoState()
+  startDemoMode(makeDemoConfig(), { explicit: true, scenarioType: type })
+  updateDemoBar(type)
+}
+
+/** Update the demo bar active state */
+function updateDemoBar(activeType: DemoScenarioType): void {
+  const bar = document.getElementById('demo-bar')
+  const label = document.getElementById('demo-bar-label')
+  if (bar) bar.classList.remove('hidden')
+  if (label) label.textContent = SCENARIO_META[activeType].label
+
+  // Update active button state
+  document.querySelectorAll('.demo-bar-btn').forEach(btn => {
+    const el = btn as HTMLElement
+    el.classList.toggle('active', el.dataset.scenario === activeType)
+  })
+}
+
+function hideDemoBar(): void {
+  document.getElementById('demo-bar')?.classList.add('hidden')
+}
+
+function setupDemoBar(): void {
+  const container = document.getElementById('demo-bar-scenarios')
+  if (!container) return
+
+  for (const [type, meta] of Object.entries(SCENARIO_META)) {
+    const btn = document.createElement('button')
+    btn.className = 'demo-bar-btn'
+    btn.dataset.scenario = type
+    btn.textContent = `${meta.icon} ${meta.label}`
+    btn.addEventListener('click', () => {
+      if (btn.classList.contains('active')) return
+      switchDemoScenario(type as DemoScenarioType)
+    })
+    container.appendChild(btn)
+  }
+}
 
 function setupNotConnectedOverlay(): void {
   const overlay = document.getElementById('not-connected-overlay')
   const retryBtn = document.getElementById('retry-connection')
-  const exploreBtn = document.getElementById('explore-offline')
+  const pickerContainer = document.getElementById('demo-picker')
   const offlineBanner = document.getElementById('offline-banner')
   const bannerDismiss = document.getElementById('offline-banner-dismiss')
 
@@ -2516,21 +2602,24 @@ function setupNotConnectedOverlay(): void {
     window.location.reload()
   })
 
-  // Explore button: start demo mode
-  exploreBtn?.addEventListener('click', () => {
-    overlay.classList.remove('visible')
-    startDemoMode({
-      handleEvent,
-      setManagedSessions: (sessions) => { state.managedSessions = sessions },
-      setClaudeToManagedLinks: (links) => {
-        claudeToManagedLink.clear()
-        for (const [k, v] of links) claudeToManagedLink.set(k, v)
-      },
-      hideOverlay: hideNotConnectedOverlay,
-      deleteZone: deleteDemoZone,
-      spawnBeam: (from, to) => state.scene?.launchSpawnBeam(from, to),
-    })
-  })
+  // Populate demo picker from SCENARIO_META
+  if (pickerContainer) {
+    for (const [type, meta] of Object.entries(SCENARIO_META)) {
+      const btn = document.createElement('button')
+      btn.className = 'demo-pick-btn'
+      btn.innerHTML = `
+        <span class="demo-pick-icon">${meta.icon}</span>
+        <span class="demo-pick-label">${meta.label}</span>
+        <span class="demo-pick-desc">${meta.description}</span>
+      `
+      btn.addEventListener('click', () => {
+        overlay.classList.remove('visible')
+        startDemoMode(makeDemoConfig(), { scenarioType: type as DemoScenarioType })
+        updateDemoBar(type as DemoScenarioType)
+      })
+      pickerContainer.appendChild(btn)
+    }
+  }
 
   // Dismiss offline banner
   bannerDismiss?.addEventListener('click', () => {
@@ -2677,24 +2766,21 @@ function init() {
       hideNotConnectedOverlay()
       if (isDemoMode() && !isExplicitDemo()) {
         stopDemoMode()
+        hideDemoBar()
       }
     }
   })
 
-  // Check for ?demo=true URL parameter
+  // Check for ?demo= URL parameter (?demo=true defaults to swarm, ?demo=pair etc.)
   const urlParams = new URLSearchParams(window.location.search)
-  if (urlParams.get('demo') === 'true') {
-    startDemoMode({
-      handleEvent,
-      setManagedSessions: (sessions) => { state.managedSessions = sessions },
-      setClaudeToManagedLinks: (links) => {
-        claudeToManagedLink.clear()
-        for (const [k, v] of links) claudeToManagedLink.set(k, v)
-      },
-      hideOverlay: hideNotConnectedOverlay,
-      deleteZone: deleteDemoZone,
-      spawnBeam: (from, to) => state.scene?.launchSpawnBeam(from, to),
-    }, { explicit: true })
+  const demoParam = urlParams.get('demo')
+  if (demoParam) {
+    const validTypes = ['swarm', 'pair', 'research', 'review'] as const
+    const scenarioType: DemoScenarioType = (validTypes as readonly string[]).includes(demoParam)
+      ? (demoParam as DemoScenarioType)
+      : 'swarm'
+    startDemoMode(makeDemoConfig(), { explicit: true, scenarioType })
+    updateDemoBar(scenarioType)
   }
 
   // Show not-connected overlay after timeout if never connected (production only)
@@ -2787,7 +2873,7 @@ function init() {
             claude.mesh.position.copy(centerStation.position)
           }
 
-          const subagents = new SubagentManager(state.scene)
+          const subagents = new SubagentManager(state.scene, zone.color)
 
           const sessionState: SessionState = {
             claude,
@@ -3016,8 +3102,9 @@ function init() {
   // Setup zone timeout modal (shown when zone creation takes too long)
   setupZoneTimeoutModal()
 
-  // Setup not-connected overlay
+  // Setup not-connected overlay and demo bar
   setupNotConnectedOverlay()
+  setupDemoBar()
 
   // Setup voice input
   // On vibecraft.sh: voice is always available via cloud proxy, set up immediately

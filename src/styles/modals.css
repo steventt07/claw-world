@@ -1050,16 +1050,72 @@
   background: rgba(167, 139, 250, 0.3);
 }
 
-.not-connected-btn-settings,
-.not-connected-btn-explore {
+.not-connected-btn-settings {
   background: rgba(255, 255, 255, 0.1);
   border-color: rgba(255, 255, 255, 0.2);
   color: rgba(255, 255, 255, 0.8);
 }
 
-.not-connected-btn-settings:hover,
-.not-connected-btn-explore:hover {
+.not-connected-btn-settings:hover {
   background: rgba(255, 255, 255, 0.15);
+}
+
+/* Demo Picker */
+.not-connected-demos {
+  margin-top: 24px;
+}
+
+.not-connected-demos-label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-bottom: 12px;
+}
+
+.demo-picker {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.demo-pick-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 14px 16px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  text-align: left;
+}
+
+.demo-pick-btn:hover {
+  background: rgba(167, 139, 250, 0.15);
+  border-color: rgba(167, 139, 250, 0.4);
+  transform: translateY(-1px);
+}
+
+.demo-pick-btn:active {
+  transform: translateY(0);
+}
+
+.demo-pick-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+
+.demo-pick-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.demo-pick-desc {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+  line-height: 1.3;
 }
 
 /* Zone Timeout Modal */

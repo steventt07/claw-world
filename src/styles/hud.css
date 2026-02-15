@@ -751,18 +751,86 @@
    Demo Mode Badge
    ============================================================================ */
 
+/* Demo mode: hide the old CSS-only badge (replaced by demo-bar) */
 .demo-mode .scene-hud::after {
-  content: 'DEMO';
-  position: fixed;
-  top: 8px;
-  right: 8px;
-  padding: 2px 8px;
+  display: none;
+}
+
+/* ============================================================================
+   Demo Bar - scenario switcher shown during demo mode
+   ============================================================================ */
+
+.demo-bar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 165, 0, 0.3);
+  border-radius: 8px;
+  padding: 6px 10px;
+  z-index: 100;
+  pointer-events: auto;
+}
+
+.demo-bar.hidden {
+  display: none;
+}
+
+.demo-bar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.demo-bar-badge {
+  padding: 2px 7px;
   background: rgba(255, 165, 0, 0.3);
   border: 1px solid rgba(255, 165, 0, 0.5);
   border-radius: 4px;
-  font-size: 11px;
-  font-weight: 600;
+  font-size: 10px;
+  font-weight: 700;
   color: #ffa500;
   letter-spacing: 1px;
-  z-index: 1000;
+}
+
+.demo-bar-label {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 500;
+}
+
+.demo-bar-scenarios {
+  display: flex;
+  gap: 4px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  padding-left: 10px;
+}
+
+.demo-bar-btn {
+  padding: 4px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  transition: all 0.15s;
+  white-space: nowrap;
+}
+
+.demo-bar-btn:hover {
+  background: rgba(167, 139, 250, 0.2);
+  border-color: rgba(167, 139, 250, 0.4);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.demo-bar-btn.active {
+  background: rgba(255, 165, 0, 0.2);
+  border-color: rgba(255, 165, 0, 0.5);
+  color: #ffa500;
+  cursor: default;
 }

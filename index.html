@@ -90,6 +90,17 @@
           </div>
         </div>
 
+        <!-- Demo Mode Bar (top of scene, hidden by default) -->
+        <div id="demo-bar" class="demo-bar hidden">
+          <div class="demo-bar-left">
+            <span class="demo-bar-badge">DEMO</span>
+            <span class="demo-bar-label" id="demo-bar-label">Agent Swarm</span>
+          </div>
+          <div class="demo-bar-scenarios" id="demo-bar-scenarios">
+            <!-- Populated dynamically -->
+          </div>
+        </div>
+
         <!-- Draw Mode UI (bottom right of scene) -->
         <div id="draw-indicator">
           <span class="draw-mode-label">DRAW MODE</span>
@@ -464,7 +475,12 @@
         </div>
         <div class="not-connected-actions">
           <button class="not-connected-btn not-connected-btn-retry" id="retry-connection">↻ Reconnect</button>
-          <button class="not-connected-btn not-connected-btn-explore" id="explore-offline">👀 Explore</button>
+        </div>
+        <div class="not-connected-demos">
+          <p class="not-connected-demos-label">Or explore a demo:</p>
+          <div class="demo-picker" id="demo-picker">
+            <!-- Populated dynamically from SCENARIO_META -->
+          </div>
         </div>
       </div>
     </div>
