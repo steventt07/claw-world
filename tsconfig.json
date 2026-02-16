@@ -1,22 +1,36 @@
 {
   "compilerOptions": {
-    "target": "ES2022",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "resolveJsonModule": true,
-    "isolatedModules": true,
     "noEmit": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@shared/*": ["shared/*"]
-    }
+      "@/*": [
+        "./src/*"
+      ],
+      "@shared/*": [
+        "./shared/*"
+      ]
+    },
+    "resolveJsonModule": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2022"
   },
-  "include": ["src/**/*", "server/**/*", "shared/**/*"],
-  "exclude": ["node_modules", "dist"]
+  "exclude": [
+    "node_modules",
+    "dist"
+  ],
+  "include": [
+    "src/**/*",
+    "server/**/*",
+    "shared/**/*"
+  ]
 }
