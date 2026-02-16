@@ -90,7 +90,7 @@ export function showIntroCard(intro: DemoEducation['intro']): Promise<void> {
     }
 
     overlay.addEventListener('click', dismiss)
-    _introTimeout = setTimeout(dismiss, 5000)
+    _introTimeout = setTimeout(dismiss, 3000)
   })
 }
 
