@@ -248,7 +248,8 @@ export class WorkshopScene {
       0.1,
       500 // Far plane extended for multi-zone viewing
     )
-    this.camera.position.set(8, 6, 8)
+    const isMobileInit = window.innerWidth <= 640
+    this.camera.position.set(isMobileInit ? 5 : 8, isMobileInit ? 4 : 6, isMobileInit ? 5 : 8)
     this.camera.lookAt(0, 0, 0)
 
     // Renderer - optimized for performance
@@ -799,7 +800,10 @@ export class WorkshopScene {
     // Account for zone elevation (raised zones from hex painting underneath)
     const target = zone.position.clone()
     target.y += zone.elevation
-    const cameraPos = target.clone().add(new THREE.Vector3(8, 6, 8))
+    // Zoom closer on mobile for better visibility of agents
+    const isMobile = window.innerWidth <= 640
+    const zoomOffset = isMobile ? new THREE.Vector3(5, 4, 5) : new THREE.Vector3(8, 6, 8)
+    const cameraPos = target.clone().add(zoomOffset)
 
     if (animate) {
       this.animateCameraTo(cameraPos, target)
@@ -957,9 +961,12 @@ export class WorkshopScene {
     const extent = Math.max(extentX, extentZ, 30)
 
     // Position camera high above looking down
-    const height = extent * 0.8
+    // Zoom closer on mobile
+    const isMobile = window.innerWidth <= 640
+    const heightMul = isMobile ? 0.6 : 0.8
+    const height = extent * heightMul
     const targetLookAt = new THREE.Vector3(centerX, 0, centerZ)
-    const targetPos = new THREE.Vector3(centerX, height, centerZ + extent * 0.3)
+    const targetPos = new THREE.Vector3(centerX, height, centerZ + extent * (isMobile ? 0.2 : 0.3))
 
     this.animateCameraTo(targetPos, targetLookAt)
     this.notifyCameraModeChange()
