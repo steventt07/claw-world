@@ -8,7 +8,7 @@
  */
 
 import type { ClaudeEvent, ManagedSession } from '../../shared/types'
-import type { DemoScenario, DemoScenarioType } from './types'
+import type { DemoScenario, DemoScenarioBundle, DemoScenarioType } from './types'
 import { createScenarioBundle } from './scenarios'
 
 // ============================================================================
@@ -26,13 +26,24 @@ export interface DemoModeConfig {
   spawnBeam?: (from: string, to: string) => void
 }
 
+export interface DemoModeOptions {
+  explicit?: boolean
+  scenarioType?: DemoScenarioType
+  /** Pre-built bundle (for replay mode) — skips createScenarioBundle() */
+  bundle?: DemoScenarioBundle
+  /** Callback when all steps finish (for non-looping bundles) */
+  onComplete?: () => void
+}
+
 // ============================================================================
 // State
 // ============================================================================
 
 let _isDemoMode = false
 let _isExplicitDemo = false  // Started via ?demo=true URL param (don't auto-stop)
+let _isReplayMode = false    // Started with a pre-built bundle (replay)
 let _timers: ReturnType<typeof setTimeout>[] = []
+let _onComplete: (() => void) | null = null
 
 // ============================================================================
 // Public API
@@ -48,23 +59,29 @@ export function isExplicitDemo(): boolean {
   return _isExplicitDemo
 }
 
+/** Check if replay mode is active (demo mode with a pre-built bundle) */
+export function isReplayMode(): boolean {
+  return _isReplayMode
+}
+
 /** Start demo mode — injects fake sessions and begins event playback */
 export function startDemoMode(
   config: DemoModeConfig,
-  options?: { explicit?: boolean; scenarioType?: DemoScenarioType },
+  options?: DemoModeOptions,
 ): void {
   if (_isDemoMode) return
 
   _isDemoMode = true
   _isExplicitDemo = options?.explicit ?? false
+  _isReplayMode = !!options?.bundle
   _timers = []
+  _onComplete = options?.onComplete ?? null
 
   // Hide any connection overlay
   config.hideOverlay()
 
-  // Create the scenario bundle for the chosen type (default: swarm)
-  const type = options?.scenarioType ?? 'swarm'
-  const bundle = createScenarioBundle(type)
+  // Use provided bundle or create one from scenario type
+  const bundle = options?.bundle ?? createScenarioBundle(options?.scenarioType ?? 'swarm')
 
   // Inject fake managed sessions
   config.setManagedSessions(bundle.managedSessions)
@@ -87,7 +104,8 @@ export function startDemoMode(
     _timers.push(timer)
   }
 
-  console.log('[Demo] Started demo mode with', bundle.scenarios.length, 'scenarios (type:', type + ')')
+  const label = options?.bundle ? 'replay bundle' : `type: ${options?.scenarioType ?? 'swarm'}`
+  console.log('[Demo] Started demo mode with', bundle.scenarios.length, 'scenarios (' + label + ')')
 }
 
 /** Stop demo mode — clears all timers and resets state */
@@ -105,6 +123,8 @@ export function stopDemoMode(): void {
 
   _isDemoMode = false
   _isExplicitDemo = false
+  _isReplayMode = false
+  _onComplete = null
   console.log('[Demo] Stopped demo mode')
 }
 
@@ -159,6 +179,16 @@ function runScenario(scenario: DemoScenario, config: DemoModeConfig): void {
     }, cumulativeDelay)
 
     _timers.push(timer)
+  }
+
+  // Non-looping mode: if cyclePause is Infinity (or very large), fire onComplete instead
+  if (!isFinite(scenario.cyclePause)) {
+    const completeTimer = setTimeout(() => {
+      if (!_isDemoMode) return
+      if (_onComplete) _onComplete()
+    }, cumulativeDelay + 500) // small buffer after last step
+    _timers.push(completeTimer)
+    return
   }
 
   // After all steps complete, schedule the next cycle

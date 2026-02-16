@@ -834,3 +834,53 @@
   color: #ffa500;
   cursor: default;
 }
+
+/* ============================================================================
+   Replay Controls (inside demo bar)
+   ============================================================================ */
+
+.replay-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.replay-controls.hidden {
+  display: none;
+}
+
+.replay-badge {
+  background: rgba(56, 189, 248, 0.3) !important;
+  border-color: rgba(56, 189, 248, 0.5) !important;
+  color: #38bdf8 !important;
+}
+
+.replay-speed-controls {
+  display: flex;
+  gap: 3px;
+}
+
+.replay-speed-btn {
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  font-size: 11px;
+  font-family: monospace;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.replay-speed-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: rgba(56, 189, 248, 0.3);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.replay-speed-btn.active {
+  background: rgba(56, 189, 248, 0.25);
+  border-color: rgba(56, 189, 248, 0.5);
+  color: #38bdf8;
+  cursor: default;
+}

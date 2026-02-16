@@ -25,6 +25,7 @@ import type {
   ClientMessage,
   PreToolUseEvent,
   PostToolUseEvent,
+  UserPromptSubmitEvent,
   ManagedSession,
   CreateSessionRequest,
   UpdateSessionRequest,
@@ -33,6 +34,7 @@ import type {
   TextTile,
   CreateTextTileRequest,
   UpdateTextTileRequest,
+  ReplaySessionSummary,
 } from '../shared/types.js'
 import { DEFAULTS } from '../shared/defaults.js'
 import { GitStatusManager } from './GitStatusManager.js'
@@ -1748,6 +1750,92 @@ function handleHttpRequest(req: IncomingMessage, res: ServerResponse) {
       res.writeHead(413, { 'Content-Type': 'application/json' })
       res.end(JSON.stringify({ error: 'Request body too large' }))
     })
+    return
+  }
+
+  // ============================================================================
+  // Replay API (session history for replay mode)
+  // ============================================================================
+
+  // GET /replay/sessions — list past sessions available for replay
+  if (req.method === 'GET' && req.url === '/replay/sessions') {
+    // Group events by sessionId
+    const sessionMap = new Map<string, ClaudeEvent[]>()
+    for (const event of events) {
+      let list = sessionMap.get(event.sessionId)
+      if (!list) {
+        list = []
+        sessionMap.set(event.sessionId, list)
+      }
+      list.push(event)
+    }
+
+    const summaries: ReplaySessionSummary[] = []
+
+    for (const [sessionId, sessionEvents] of sessionMap) {
+      // Filter out sessions with too few events to be interesting
+      if (sessionEvents.length < 3) continue
+
+      // Find first prompt
+      let firstPrompt: string | null = null
+      for (const e of sessionEvents) {
+        if (e.type === 'user_prompt_submit') {
+          firstPrompt = (e as UserPromptSubmitEvent).prompt
+          break
+        }
+      }
+
+      // Count tools
+      const tools: Record<string, number> = {}
+      let toolCount = 0
+      for (const e of sessionEvents) {
+        if (e.type === 'pre_tool_use') {
+          const tool = (e as PreToolUseEvent).tool
+          tools[tool] = (tools[tool] ?? 0) + 1
+          toolCount++
+        }
+      }
+
+      // Determine name from managed session if available
+      const managed = findManagedSession(sessionId)
+      const name = managed?.name ?? `Session ${sessionId.slice(0, 8)}`
+
+      // Time range
+      const startTime = sessionEvents[0].timestamp
+      const endTime = sessionEvents[sessionEvents.length - 1].timestamp
+
+      // CWD from first event
+      const cwd = sessionEvents[0].cwd || null
+
+      summaries.push({
+        sessionId,
+        name,
+        firstPrompt,
+        toolCount,
+        eventCount: sessionEvents.length,
+        startTime,
+        endTime,
+        cwd,
+        tools,
+      })
+    }
+
+    // Sort most recent first
+    summaries.sort((a, b) => b.endTime - a.endTime)
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ ok: true, sessions: summaries }))
+    return
+  }
+
+  // GET /replay/sessions/:sessionId/events — get all events for a session
+  const replayMatch = req.url?.match(/^\/replay\/sessions\/([^/?]+)\/events$/)
+  if (req.method === 'GET' && replayMatch) {
+    const sessionId = decodeURIComponent(replayMatch[1])
+    const sessionEvents = events.filter(e => e.sessionId === sessionId)
+
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ ok: true, events: sessionEvents }))
     return
   }
 

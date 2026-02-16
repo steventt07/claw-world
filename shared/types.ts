@@ -429,6 +429,23 @@ export interface UpdateTextTileRequest {
 }
 
 // ============================================================================
+// Replay (Session History)
+// ============================================================================
+
+/** Summary of a past session available for replay */
+export interface ReplaySessionSummary {
+  sessionId: string
+  name: string
+  firstPrompt: string | null
+  toolCount: number
+  eventCount: number
+  startTime: number
+  endTime: number
+  cwd: string | null
+  tools: Record<string, number>
+}
+
+// ============================================================================
 // Configuration
 // ============================================================================
 

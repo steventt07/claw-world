@@ -60,7 +60,11 @@ import { checkForUpdates } from './ui/VersionChecker'
 import { drawMode } from './ui/DrawMode'
 import { setupTextLabelModal, showTextLabelModal } from './ui/TextLabelModal'
 import { createSessionAPI, type SessionAPI } from './api'
-import { startDemoMode, stopDemoMode, isDemoMode, isExplicitDemo, SCENARIO_META, type DemoScenarioType } from './demo'
+import {
+  startDemoMode, stopDemoMode, isDemoMode, isExplicitDemo, isReplayMode,
+  SCENARIO_META, fetchReplaySessions, createReplayBundle,
+  type DemoModeConfig, type DemoScenarioType, type ReplaySpeed,
+} from './demo'
 
 // ============================================================================
 // Configuration
@@ -1436,8 +1440,8 @@ function getOrCreateSession(sessionId: string): SessionState | null {
     state.scene.updateZoneLabel(sessionId, linkedManagedSession.name, keybind)
     console.log(`Linked Claude session ${sessionId.slice(0, 8)} to "${linkedManagedSession.name}"`)
 
-    // Save zone position to server if not already saved
-    if (!linkedManagedSession.zonePosition) {
+    // Save zone position to server if not already saved (skip for replay sessions)
+    if (!linkedManagedSession.zonePosition && !linkedManagedSession.id.startsWith('replay-managed-')) {
       const hexPos = state.scene.getZoneHexPosition(sessionId)
       if (hexPos) {
         saveZonePosition(linkedManagedSession.id, hexPos)
@@ -1489,8 +1493,8 @@ function getOrCreateSession(sessionId: string): SessionState | null {
  * Returns true if already linked or if there's a recently-created unlinked managed session
  */
 function canLinkToManagedSession(claudeSessionId: string): boolean {
-  // Demo sessions are always linkable
-  if (isDemoMode() && claudeSessionId.startsWith('demo-')) return true
+  // Demo/replay sessions are always linkable
+  if (isDemoMode() && (claudeSessionId.startsWith('demo-') || claudeSessionId.startsWith('replay-'))) return true
 
   // Already linked?
   if (claudeToManagedLink.has(claudeSessionId)) {
@@ -2529,17 +2533,17 @@ function makeDemoConfig() {
   }
 }
 
-/** Clean up all demo session state (zones, sessions, links) so a fresh demo can start */
+/** Clean up all demo/replay session state (zones, sessions, links) so a fresh run can start */
 function cleanupDemoState(): void {
-  // Delete all zones and session state
+  // Delete all zones and session state (demo- and replay- prefixed)
   for (const [sessionId, sessionState] of state.sessions) {
-    if (sessionId.startsWith('demo-')) {
+    if (sessionId.startsWith('demo-') || sessionId.startsWith('replay-')) {
       sessionState.claude.dispose()
       state.sessions.delete(sessionId)
       state.scene?.deleteZone(sessionId)
     }
   }
-  // Clear managed sessions and links that were demo-related
+  // Clear managed sessions and links that were demo/replay-related
   claudeToManagedLink.clear()
   state.managedSessions = []
   state.selectedManagedSession = null
@@ -2587,6 +2591,302 @@ function setupDemoBar(): void {
     })
     container.appendChild(btn)
   }
+}
+
+// ============================================================================
+// Replay Mode
+// ============================================================================
+
+/** Current replay speed (tracked so we can restart with new speed) */
+let _replaySpeed: ReplaySpeed = 4
+let _replaySessionId: string | null = null
+let _replaySessionName: string | null = null
+
+/** Start replaying a past session */
+async function startReplay(sessionId: string, name: string, speed: ReplaySpeed = 4): Promise<void> {
+  _replaySpeed = speed
+  _replaySessionId = sessionId
+  _replaySessionName = name
+
+  try {
+    const bundle = await createReplayBundle(API_URL, sessionId, name, { speed })
+
+    // Use a merging config so we don't destroy existing sessions
+    const config: DemoModeConfig = {
+      handleEvent,
+      setManagedSessions: (sessions) => {
+        // ADD replay sessions alongside existing ones (don't replace)
+        state.managedSessions = [...state.managedSessions, ...sessions]
+      },
+      setClaudeToManagedLinks: (links) => {
+        // ADD replay links without clearing existing ones
+        for (const [k, v] of links) claudeToManagedLink.set(k, v)
+      },
+      hideOverlay: hideNotConnectedOverlay,
+      deleteZone: deleteDemoZone,
+      spawnBeam: (from, to) => state.scene?.launchSpawnBeam(from, to),
+    }
+
+    startDemoMode(config, {
+      explicit: true,
+      bundle,
+      onComplete: () => {
+        console.log('[Replay] Playback complete')
+      },
+    })
+
+    // Update sidebar to show replay session alongside existing ones
+    renderManagedSessions()
+    updateReplayBar(name, speed)
+
+    // Focus camera on the replay zone once it's created (small delay for zone creation)
+    const replaySessionId = bundle.sessionIds[0]
+    setTimeout(() => {
+      if (state.scene && replaySessionId) {
+        state.scene.focusZone(replaySessionId)
+      }
+    }, 300)
+  } catch (e) {
+    console.error('[Replay] Failed to start:', e)
+    toast.error(`Failed to start replay: ${e instanceof Error ? e.message : e}`)
+  }
+}
+
+/** Stop an active replay */
+function stopReplay(): void {
+  stopDemoMode()
+
+  // Only clean up replay-specific state (preserve existing sessions)
+  for (const [sessionId, sessionState] of state.sessions) {
+    if (sessionId.startsWith('replay-')) {
+      sessionState.claude.dispose()
+      state.sessions.delete(sessionId)
+      state.scene?.deleteZone(sessionId)
+    }
+  }
+  for (const key of Array.from(claudeToManagedLink.keys())) {
+    if (key.startsWith('replay-')) claudeToManagedLink.delete(key)
+  }
+  state.managedSessions = state.managedSessions.filter(s => !s.id.startsWith('replay-managed-'))
+  renderManagedSessions()
+
+  hideReplayBar()
+  _replaySessionId = null
+  _replaySessionName = null
+}
+
+/** Change replay speed — stops and restarts with new speed */
+async function changeReplaySpeed(speed: ReplaySpeed): Promise<void> {
+  const id = _replaySessionId
+  const name = _replaySessionName
+  if (!id || !name) return
+  stopReplay()
+  await startReplay(id, name, speed)
+}
+
+/** Show the replay controls bar and hide demo bar elements */
+function updateReplayBar(name: string, speed: ReplaySpeed): void {
+  const bar = document.getElementById('demo-bar')
+  const demoLeft = bar?.querySelector('.demo-bar-left') as HTMLElement | null
+  const demoScenarios = document.getElementById('demo-bar-scenarios')
+  const replayControls = document.getElementById('replay-controls')
+  const nameEl = document.getElementById('replay-session-name')
+
+  if (bar) bar.classList.remove('hidden')
+  if (demoLeft) demoLeft.style.display = 'none'
+  if (demoScenarios) demoScenarios.style.display = 'none'
+  if (replayControls) replayControls.classList.remove('hidden')
+  if (nameEl) nameEl.textContent = name
+
+  // Update active speed button
+  document.querySelectorAll('.replay-speed-btn').forEach(btn => {
+    const el = btn as HTMLElement
+    el.classList.toggle('active', el.dataset.speed === String(speed))
+  })
+}
+
+/** Hide replay controls and restore demo bar elements */
+function hideReplayBar(): void {
+  const bar = document.getElementById('demo-bar')
+  const demoLeft = bar?.querySelector('.demo-bar-left') as HTMLElement | null
+  const demoScenarios = document.getElementById('demo-bar-scenarios')
+  const replayControls = document.getElementById('replay-controls')
+
+  if (bar) bar.classList.add('hidden')
+  if (demoLeft) demoLeft.style.display = ''
+  if (demoScenarios) demoScenarios.style.display = ''
+  if (replayControls) replayControls.classList.add('hidden')
+}
+
+/** Wire replay bar button handlers */
+function setupReplayBar(): void {
+  // Speed buttons
+  document.querySelectorAll('.replay-speed-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const el = btn as HTMLElement
+      if (el.classList.contains('active')) return
+      const speed = parseInt(el.dataset.speed ?? '4', 10) as ReplaySpeed
+      changeReplaySpeed(speed)
+    })
+  })
+
+  // Stop button
+  document.getElementById('replay-stop-btn')?.addEventListener('click', () => {
+    stopReplay()
+  })
+}
+
+/** Format duration from ms to human-readable */
+function formatDuration(ms: number): string {
+  const seconds = Math.floor(ms / 1000)
+  if (seconds < 60) return `${seconds}s`
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes}m`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}h ${minutes % 60}m`
+}
+
+/** Fetch sessions and populate the replay picker in the not-connected overlay */
+async function setupReplayPicker(): Promise<void> {
+  const container = document.getElementById('replay-picker')
+  const wrapper = document.getElementById('not-connected-replays')
+  if (!container || !wrapper) return
+
+  try {
+    const sessions = await fetchReplaySessions(API_URL)
+    if (sessions.length === 0) return
+
+    // Show the replay section
+    wrapper.classList.remove('hidden')
+
+    // Show up to 6 most recent sessions
+    const shown = sessions.slice(0, 6)
+    for (const session of shown) {
+      const btn = document.createElement('button')
+      btn.className = 'replay-pick-btn'
+
+      const duration = formatDuration(session.endTime - session.startTime)
+      const toolNames = Object.keys(session.tools).slice(0, 3).join(', ')
+      const promptSnippet = session.firstPrompt
+        ? session.firstPrompt.slice(0, 80) + (session.firstPrompt.length > 80 ? '...' : '')
+        : 'No prompt'
+
+      btn.innerHTML = `
+        <span class="replay-pick-name">${escapeHtml(session.name)}</span>
+        <span class="replay-pick-meta">
+          <span>${session.toolCount} tools</span>
+          <span>${duration}</span>
+          <span>${toolNames || 'no tools'}</span>
+        </span>
+        <span class="replay-pick-prompt">${escapeHtml(promptSnippet)}</span>
+      `
+
+      btn.addEventListener('click', () => {
+        const overlay = document.getElementById('not-connected-overlay')
+        overlay?.classList.remove('visible')
+        startReplay(session.sessionId, session.name)
+      })
+
+      container.appendChild(btn)
+    }
+  } catch (e) {
+    // Server not available — no replay picker, that's fine
+    console.debug('[Replay] Could not fetch sessions:', e)
+  }
+}
+
+/** Open the replay modal and populate it with sessions from the server */
+async function openReplayModal(): Promise<void> {
+  const modal = document.getElementById('replay-modal')
+  const list = document.getElementById('replay-modal-list')
+  if (!modal || !list) return
+
+  // Show modal with loading state
+  list.innerHTML = '<div class="replay-modal-loading">Loading sessions...</div>'
+  modal.classList.add('visible')
+
+  try {
+    const sessions = await fetchReplaySessions(API_URL)
+
+    if (sessions.length === 0) {
+      list.innerHTML = '<div class="replay-modal-empty">No sessions to replay. Use Claude Code to generate some events first.</div>'
+      return
+    }
+
+    list.innerHTML = ''
+    for (const session of sessions.slice(0, 12)) {
+      const btn = document.createElement('button')
+      btn.className = 'replay-session-btn'
+
+      const duration = formatDuration(session.endTime - session.startTime)
+      const promptSnippet = session.firstPrompt
+        ? session.firstPrompt.slice(0, 100) + (session.firstPrompt.length > 100 ? '...' : '')
+        : 'No prompt'
+      const timeAgo = formatTimeAgo(session.endTime)
+
+      // Top 4 tools as tags
+      const topTools = Object.entries(session.tools)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(([tool, count]) => `<span class="replay-tool-tag">${escapeHtml(tool)} ${count}</span>`)
+        .join('')
+
+      btn.innerHTML = `
+        <div class="replay-session-top">
+          <span class="replay-session-name">${escapeHtml(session.name)}</span>
+          <span class="replay-session-time">${timeAgo}</span>
+        </div>
+        <span class="replay-session-meta">
+          <span>${session.toolCount} tools</span>
+          <span>${duration}</span>
+          <span>${session.eventCount} events</span>
+        </span>
+        <span class="replay-session-prompt">${escapeHtml(promptSnippet)}</span>
+        <div class="replay-session-tools">${topTools}</div>
+      `
+
+      btn.addEventListener('click', () => {
+        modal.classList.remove('visible')
+        startReplay(session.sessionId, session.name)
+      })
+
+      list.appendChild(btn)
+    }
+  } catch (e) {
+    list.innerHTML = `<div class="replay-modal-empty">Could not load sessions. Is the server running?</div>`
+    console.error('[Replay] Failed to fetch sessions:', e)
+  }
+}
+
+/** Set up the replay modal (close button, backdrop click, HUD button) */
+function setupReplayModal(): void {
+  const modal = document.getElementById('replay-modal')
+  const closeBtn = document.getElementById('replay-modal-close')
+  const hudBtn = document.getElementById('replay-btn')
+
+  // HUD button opens the modal
+  hudBtn?.addEventListener('click', () => {
+    openReplayModal()
+  })
+
+  // Close button
+  closeBtn?.addEventListener('click', () => {
+    modal?.classList.remove('visible')
+  })
+
+  // Click backdrop to close
+  modal?.addEventListener('click', (e) => {
+    if (e.target === modal) {
+      modal.classList.remove('visible')
+    }
+  })
+
+  // Escape to close
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && modal?.classList.contains('visible')) {
+      modal.classList.remove('visible')
+    }
+  })
 }
 
 function setupNotConnectedOverlay(): void {
@@ -2781,6 +3081,12 @@ function init() {
       : 'swarm'
     startDemoMode(makeDemoConfig(), { explicit: true, scenarioType })
     updateDemoBar(scenarioType)
+  }
+
+  // Check for ?replay= URL parameter — auto-start replay
+  const replayParam = urlParams.get('replay')
+  if (replayParam && !demoParam) {
+    startReplay(replayParam, `Session ${replayParam.slice(0, 8)}`)
   }
 
   // Show not-connected overlay after timeout if never connected (production only)
@@ -3102,9 +3408,12 @@ function init() {
   // Setup zone timeout modal (shown when zone creation takes too long)
   setupZoneTimeoutModal()
 
-  // Setup not-connected overlay and demo bar
+  // Setup not-connected overlay, demo bar, and replay
   setupNotConnectedOverlay()
   setupDemoBar()
+  setupReplayBar()
+  setupReplayModal()
+  setupReplayPicker() // async, non-blocking
 
   // Setup voice input
   // On vibecraft.sh: voice is always available via cloud proxy, set up immediately

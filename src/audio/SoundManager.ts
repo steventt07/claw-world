@@ -301,8 +301,12 @@ class SoundManager {
       this.currentSpatialVolume = 1
     }
 
-    // Play the sound
-    soundFn()
+    // Play the sound (catch Tone.js timing errors from rapid-fire events)
+    try {
+      soundFn()
+    } catch {
+      // Ignore audio scheduling errors (e.g. "Start time must be strictly greater than previous start time")
+    }
 
     // Reset for next sound
     this.currentSpatialVolume = 1

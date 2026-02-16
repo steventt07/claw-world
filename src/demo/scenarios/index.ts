@@ -24,22 +24,22 @@ export interface ScenarioMeta {
 export const SCENARIO_META: Record<DemoScenarioType, ScenarioMeta> = {
   swarm: {
     label: 'Agent Swarm',
-    description: '3 orchestrators, 10 agents building in parallel',
+    description: '3 orchestrators spawn 7 sub-agents in parallel',
     icon: '\u{1F41D}', // bee
   },
   pair: {
     label: 'Pair Programming',
-    description: '2 sessions: Alice (frontend) + Bob (backend)',
+    description: 'Alice + Bob each delegate side-tasks to sub-agents',
     icon: '\u{1F46F}', // people with bunny ears
   },
   research: {
     label: 'Research Sprint',
-    description: 'Deep research, then burst of building',
+    description: '2 sub-agents research in parallel, then build',
     icon: '\u{1F50D}', // magnifying glass
   },
   review: {
     label: 'Code Review',
-    description: 'Methodical reading, scanning, and fixing',
+    description: '3 sub-agents scan security, coverage, and deps',
     icon: '\u{1F50E}', // magnifying glass tilted right
   },
 }

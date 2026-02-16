@@ -41,6 +41,7 @@
             <span class="hud-sep">|</span>
             <span id="token-counter" class="hud-tokens" title="Tokens used this session">⚡ 0 tok</span>
             <span class="hud-sep">|</span>
+            <button id="replay-btn" class="hud-btn" title="Replay a past session">▶️</button>
             <button id="settings-btn" class="hud-btn" title="Settings">⚙️</button>
             <!-- Debug: FPS counter (uncomment to enable)
             <span class="hud-sep">|</span>
@@ -98,6 +99,18 @@
           </div>
           <div class="demo-bar-scenarios" id="demo-bar-scenarios">
             <!-- Populated dynamically -->
+          </div>
+          <div id="replay-controls" class="replay-controls hidden">
+            <span class="demo-bar-badge replay-badge">REPLAY</span>
+            <span id="replay-session-name" class="demo-bar-label"></span>
+            <div class="replay-speed-controls">
+              <button class="replay-speed-btn" data-speed="1">1x</button>
+              <button class="replay-speed-btn" data-speed="2">2x</button>
+              <button class="replay-speed-btn active" data-speed="4">4x</button>
+              <button class="replay-speed-btn" data-speed="8">8x</button>
+              <button class="replay-speed-btn" data-speed="16">16x</button>
+            </div>
+            <button id="replay-stop-btn" class="demo-bar-btn">Stop</button>
           </div>
         </div>
 
@@ -291,6 +304,21 @@
       </div>
     </div>
 
+    <!-- Replay Modal -->
+    <div id="replay-modal">
+      <div class="modal-content replay-modal-content">
+        <div class="modal-header">
+          <h3>Replay a Past Session</h3>
+        </div>
+        <div id="replay-modal-list" class="replay-modal-list">
+          <div class="replay-modal-loading">Loading sessions...</div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="modal-btn modal-btn-cancel" id="replay-modal-close">Close</button>
+        </div>
+      </div>
+    </div>
+
     <!-- About Modal -->
     <div id="about-modal">
       <div class="modal-content about-modal-content">
@@ -480,6 +508,12 @@
           <p class="not-connected-demos-label">Or explore a demo:</p>
           <div class="demo-picker" id="demo-picker">
             <!-- Populated dynamically from SCENARIO_META -->
+          </div>
+        </div>
+        <div class="not-connected-replays hidden" id="not-connected-replays">
+          <p class="not-connected-demos-label">Or replay a past session:</p>
+          <div class="replay-picker" id="replay-picker">
+            <!-- Populated dynamically from server -->
           </div>
         </div>
       </div>
