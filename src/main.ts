@@ -3695,9 +3695,11 @@ function init() {
     initAudioOnInteraction()
     document.removeEventListener('click', initAudioOnce)
     document.removeEventListener('keydown', initAudioOnce)
+    document.removeEventListener('touchstart', initAudioOnce)
   }
   document.addEventListener('click', initAudioOnce)
   document.addEventListener('keydown', initAudioOnce)
+  document.addEventListener('touchstart', initAudioOnce)
 
   // Initial UI state
   updateStatus(false, 'Connecting...')
