@@ -62,6 +62,7 @@ import { setupDirectoryAutocomplete } from './ui/DirectoryAutocomplete'
 import { checkForUpdates } from './ui/VersionChecker'
 import { drawMode } from './ui/DrawMode'
 import { setupTextLabelModal, showTextLabelModal } from './ui/TextLabelModal'
+import { setupWaitlistModal } from './ui/WaitlistModal'
 import { showIntroCard, showSummaryCard } from './ui/DemoCards'
 import { initMobileTabController, type MobileTabController } from './ui/MobileTabController'
 import { StationLegend } from './ui/StationLegend'
@@ -3610,6 +3611,7 @@ function init() {
 
   // Setup text label modal (for hex text labels)
   setupTextLabelModal()
+  setupWaitlistModal()
 
   // Setup zone command modal (quick command input near zone)
   setupZoneCommandModal()

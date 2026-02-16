@@ -551,6 +551,37 @@
       </div>
     </div>
 
+    <!-- Waitlist FAB -->
+    <button id="waitlist-fab" class="waitlist-fab" title="Join the beta waitlist">
+      <span class="fab-icon">🚀</span>
+      <span class="fab-label">Join Beta</span>
+    </button>
+
+    <!-- Waitlist Modal -->
+    <div id="waitlist-modal">
+      <div class="modal-content waitlist-modal-content">
+        <div class="modal-header">
+          <h3>🚀 Join the Beta</h3>
+        </div>
+        <p class="waitlist-desc">Be among the first to try Vibecraft2. Sign up for early access and we'll notify you when it's ready.</p>
+        <form id="waitlist-form">
+          <div class="modal-field">
+            <label for="waitlist-email">Email *</label>
+            <input type="email" id="waitlist-email" placeholder="you@example.com" required autocomplete="email" />
+          </div>
+          <div class="modal-field">
+            <label for="waitlist-name">Name (optional)</label>
+            <input type="text" id="waitlist-name" placeholder="Your name" autocomplete="name" />
+          </div>
+          <div id="waitlist-status" class="waitlist-status"></div>
+          <div class="modal-actions">
+            <button type="button" class="modal-btn modal-btn-cancel" id="waitlist-close">Cancel</button>
+            <button type="submit" class="modal-btn modal-btn-create" id="waitlist-submit">Join the Waitlist</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Toast notifications -->
     <div id="toast-container"></div>
 
