@@ -249,7 +249,7 @@ export class WorkshopScene {
       500 // Far plane extended for multi-zone viewing
     )
     const isMobileInit = window.innerWidth <= 640
-    this.camera.position.set(isMobileInit ? 20 : 8, isMobileInit ? 16 : 6, isMobileInit ? 20 : 8)
+    this.camera.position.set(isMobileInit ? 40 : 8, isMobileInit ? 32 : 6, isMobileInit ? 40 : 8)
     this.camera.lookAt(0, 0, 0)
 
     // Renderer - optimized for performance
@@ -802,7 +802,7 @@ export class WorkshopScene {
     target.y += zone.elevation
     // Zoom closer on mobile for better visibility of agents
     const isMobile = window.innerWidth <= 640
-    const zoomOffset = isMobile ? new THREE.Vector3(20, 16, 20) : new THREE.Vector3(8, 6, 8)
+    const zoomOffset = isMobile ? new THREE.Vector3(40, 32, 40) : new THREE.Vector3(8, 6, 8)
     const cameraPos = target.clone().add(zoomOffset)
 
     if (animate) {
