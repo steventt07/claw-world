@@ -124,7 +124,7 @@ export function startDemoMode(
 
   // Determine intro delay (show intro card before scenarios start)
   const showIntro = !options?.skipIntro && bundle.education?.intro
-  const introDelay = showIntro ? 5000 : 0
+  const introDelay = showIntro ? 2000 : 0
 
   // Show intro card if available
   if (showIntro && config.showIntroCard) {
