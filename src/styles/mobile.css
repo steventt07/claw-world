@@ -1,0 +1,290 @@
+/* Mobile responsive styles */
+
+/* Tablets and below */
+@media (max-width: 1024px) {
+  #app {
+    flex-direction: column;
+  }
+
+  #scene-panel {
+    width: 100%;
+    height: 45vh;
+    border-right: none;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  #feed-panel {
+    width: 100%;
+    height: 55vh;
+  }
+
+  /* Compact HUD */
+  .scene-badge.unified-hud {
+    gap: 6px;
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+
+  .hud-sep {
+    display: none;
+  }
+
+  /* Hide keybind helper on mobile */
+  #keybind-helper {
+    display: none;
+  }
+
+  /* Compact timeline */
+  #timeline-container {
+    bottom: 6px;
+    left: 6px;
+    right: 6px;
+  }
+
+  #timeline {
+    padding: 6px 8px;
+    gap: 3px;
+  }
+
+  .timeline-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
+  }
+
+  /* Compact voice control */
+  .voice-control {
+    bottom: 50px;
+  }
+
+  .voice-trigger {
+    width: 40px;
+    height: 40px;
+    font-size: 16px;
+  }
+
+  .voice-hint {
+    display: none;
+  }
+
+  /* Compact sessions */
+  #sessions-list {
+    max-height: 120px;
+    padding: 0 6px 6px;
+  }
+
+  #managed-sessions {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 4px;
+  }
+
+  .session-item {
+    padding: 6px 8px;
+  }
+
+  .session-item .session-hotkey {
+    display: none;
+  }
+
+  /* Compact feed header */
+  #feed-header {
+    padding: 10px 14px;
+  }
+
+  #feed-header h2 {
+    font-size: 13px;
+  }
+
+  #feed-header h2 .muted {
+    display: none;
+  }
+
+  /* Compact feed */
+  #activity-feed {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .feed-item {
+    padding: 8px 10px;
+  }
+
+  .feed-item-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 14px;
+  }
+
+  .feed-item-title {
+    font-size: 12px;
+  }
+
+  /* Compact prompt */
+  #prompt-container {
+    padding: 10px;
+  }
+
+  #prompt-input {
+    padding: 10px 12px;
+    font-size: 13px;
+    min-height: 38px;
+  }
+
+  #prompt-submit, #prompt-cancel {
+    padding: 6px 10px;
+    font-size: 12px;
+  }
+
+  #prompt-options {
+    margin-top: 6px;
+    gap: 10px;
+  }
+
+  /* Draw mode */
+  #draw-indicator {
+    top: 40px;
+    padding: 8px 14px;
+  }
+
+  .draw-mode-hint {
+    display: none;
+  }
+
+  #draw-palette {
+    bottom: 50px;
+    right: 6px;
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .draw-color-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  /* Demo bar */
+  .demo-bar {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .demo-bar-scenarios {
+    gap: 4px;
+  }
+
+  /* Modals - full width on small screens */
+  .modal-content {
+    width: calc(100vw - 32px);
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 20px;
+  }
+}
+
+/* Phones */
+@media (max-width: 640px) {
+  #scene-panel {
+    height: 35vh;
+  }
+
+  #feed-panel {
+    height: 65vh;
+  }
+
+  /* Even more compact HUD */
+  .scene-badge.unified-hud {
+    padding: 4px 8px;
+    font-size: 10px;
+    gap: 4px;
+  }
+
+  #token-counter {
+    display: none;
+  }
+
+  .hud-btn {
+    font-size: 12px;
+    padding: 2px;
+  }
+
+  /* Hide timeline on very small screens */
+  #timeline-container {
+    display: none;
+  }
+
+  /* Voice control minimal */
+  .voice-control {
+    bottom: 12px;
+  }
+
+  /* Sessions compact */
+  #sessions-list {
+    max-height: 80px;
+  }
+
+  #managed-sessions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .session-item .session-icon {
+    display: none;
+  }
+
+  .session-item .session-name {
+    font-size: 11px;
+  }
+
+  .session-item .session-detail {
+    display: none;
+  }
+
+  /* Prompt - stack buttons */
+  #prompt-form {
+    flex-wrap: wrap;
+  }
+
+  .input-wrapper {
+    width: 100%;
+  }
+
+  #prompt-submit, #prompt-cancel {
+    flex: 1;
+  }
+
+  /* Dev panel */
+  #dev-panel {
+    top: 40px;
+    right: 6px;
+    left: 6px;
+    max-height: 200px;
+  }
+
+  /* Feed empty state */
+  #feed-empty {
+    padding: 30px 16px;
+  }
+
+  #feed-empty-icon {
+    font-size: 36px;
+  }
+
+  /* Modal adjustments */
+  .modal-content {
+    padding: 16px;
+    border-radius: 10px;
+  }
+
+  .modal-btn {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  /* About modal */
+  .about-commands {
+    gap: 6px;
+  }
+
+  .about-cmd code {
+    font-size: 11px;
+  }
+}
