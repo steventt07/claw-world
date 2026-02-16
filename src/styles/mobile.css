@@ -172,6 +172,31 @@
     gap: 4px;
   }
 
+  /* Demo cards */
+  .demo-card-overlay {
+    padding: 16px;
+    align-items: flex-start;
+    overflow-y: auto;
+  }
+
+  .demo-card {
+    padding: 20px 22px;
+    max-width: 100%;
+    margin-top: 40px;
+  }
+
+  .demo-card-title {
+    font-size: 18px;
+  }
+
+  .demo-card-description {
+    font-size: 13px;
+  }
+
+  .demo-card-watch-list li {
+    font-size: 12px;
+  }
+
   /* Modals - full width on small screens */
   .modal-content {
     width: calc(100vw - 32px);
