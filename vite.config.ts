@@ -1,11 +1,12 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'path'
+import { componentTagger } from 'lovable-tagger'
 import { DEFAULTS } from './shared/defaults'
 
 const clientPort = parseInt(process.env.VIBECRAFT2_CLIENT_PORT ?? String(DEFAULTS.CLIENT_PORT), 10)
 const serverPort = parseInt(process.env.VIBECRAFT2_PORT ?? String(DEFAULTS.SERVER_PORT), 10)
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
@@ -16,7 +17,11 @@ export default defineConfig({
     // Inject default port into frontend at build time
     __VIBECRAFT2_DEFAULT_PORT__: serverPort,
   },
+  plugins: [
+    mode === 'development' && componentTagger(),
+  ].filter(Boolean),
   server: {
+    host: '::',
     port: 8080,
     proxy: {
       '/ws': {
@@ -33,4 +38,4 @@ export default defineConfig({
     target: 'esnext',
     sourcemap: true,
   },
-})
+}))
