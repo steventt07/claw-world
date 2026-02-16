@@ -100,6 +100,7 @@
           <div class="demo-bar-scenarios" id="demo-bar-scenarios">
             <!-- Populated dynamically -->
           </div>
+          <button class="demo-legend-btn" id="demo-legend-btn" title="Toggle station legend (L)">?</button>
           <div id="replay-controls" class="replay-controls hidden">
             <span class="demo-bar-badge replay-badge">REPLAY</span>
             <span id="replay-session-name" class="demo-bar-label"></span>
@@ -112,6 +113,18 @@
             </div>
             <button id="replay-stop-btn" class="demo-bar-btn">Stop</button>
           </div>
+        </div>
+
+        <!-- Demo Phase Banner (shown during demo, below demo-bar) -->
+        <div id="demo-phase">
+          <span class="demo-phase-name" id="demo-phase-name"></span>
+          <span class="demo-phase-desc" id="demo-phase-desc"></span>
+        </div>
+
+        <!-- Demo Progress Bar (thin bar showing scenario progress) -->
+        <div id="demo-progress">
+          <div class="demo-progress-fill" id="demo-progress-fill"></div>
+          <div class="demo-progress-segments" id="demo-progress-segments"></div>
         </div>
 
         <!-- Draw Mode UI (bottom right of scene) -->

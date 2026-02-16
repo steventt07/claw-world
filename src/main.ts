@@ -39,7 +39,7 @@ import {
   hideQuestionModal,
   type QuestionData,
 } from './ui/QuestionModal'
-import { toast } from './ui/Toast'
+import { toast, showToast } from './ui/Toast'
 import {
   setupZoneInfoModal,
   showZoneInfoModal,
@@ -59,6 +59,8 @@ import { setupDirectoryAutocomplete } from './ui/DirectoryAutocomplete'
 import { checkForUpdates } from './ui/VersionChecker'
 import { drawMode } from './ui/DrawMode'
 import { setupTextLabelModal, showTextLabelModal } from './ui/TextLabelModal'
+import { showIntroCard, showSummaryCard } from './ui/DemoCards'
+import { StationLegend } from './ui/StationLegend'
 import { createSessionAPI, type SessionAPI } from './api'
 import {
   startDemoMode, stopDemoMode, isDemoMode, isExplicitDemo, isReplayMode,
@@ -163,6 +165,9 @@ const state: AppState = {
 
 // Expose for console testing (can remove in production)
 ;(window as any).state = state
+
+// Station legend overlay for demo mode
+let stationLegend: StationLegend | null = null
 
 // Track pending zone hints for direction-aware placement
 // Maps managed session name → click position (used when zone is created)
@@ -2519,7 +2524,7 @@ function setupAboutModal(): void {
 // ============================================================================
 
 /** Build the DemoModeConfig needed by startDemoMode — avoids duplication */
-function makeDemoConfig() {
+function makeDemoConfig(): DemoModeConfig {
   return {
     handleEvent,
     setManagedSessions: (sessions: ManagedSession[]) => { state.managedSessions = sessions },
@@ -2530,6 +2535,41 @@ function makeDemoConfig() {
     hideOverlay: hideNotConnectedOverlay,
     deleteZone: deleteDemoZone,
     spawnBeam: (from: string, to: string) => state.scene?.launchSpawnBeam(from, to),
+    enableFollowActive: () => state.scene?.setFollowActiveMode(),
+    focusZone: (sessionId: string) => {
+      if (state.scene) {
+        // Force focus override: reset dwell timer and focus directly
+        state.scene.focusZone(sessionId)
+      }
+    },
+    updatePhase: (name: string, description: string) => {
+      const phaseEl = document.getElementById('demo-phase')
+      const nameEl = document.getElementById('demo-phase-name')
+      const descEl = document.getElementById('demo-phase-desc')
+      if (phaseEl && nameEl && descEl) {
+        nameEl.textContent = name
+        descEl.textContent = description
+        phaseEl.classList.add('visible')
+      }
+    },
+    showNarration: (text: string, duration?: number) => {
+      const el = showToast(text, { type: 'info', icon: '\u{1F4D6}', duration: duration ?? 6000 })
+      el.classList.add('toast-narration')
+    },
+    onProgress: (percent: number, _phaseName: string) => {
+      const fill = document.getElementById('demo-progress-fill')
+      const progressEl = document.getElementById('demo-progress')
+      if (fill) fill.style.width = `${Math.min(100, percent * 100)}%`
+      if (progressEl && !progressEl.classList.contains('visible')) {
+        progressEl.classList.add('visible')
+      }
+    },
+    showIntroCard: async (intro) => {
+      await showIntroCard(intro)
+    },
+    showSummaryCard: (summary) => {
+      showSummaryCard(summary)
+    },
   }
 }
 
@@ -2554,7 +2594,10 @@ function cleanupDemoState(): void {
 function switchDemoScenario(type: DemoScenarioType): void {
   stopDemoMode()
   cleanupDemoState()
-  startDemoMode(makeDemoConfig(), { explicit: true, scenarioType: type })
+  // Reset progress bar fill
+  const fill = document.getElementById('demo-progress-fill')
+  if (fill) fill.style.width = '0%'
+  startDemoMode(makeDemoConfig(), { explicit: true, scenarioType: type, skipIntro: true })
   updateDemoBar(type)
 }
 
@@ -2570,10 +2613,18 @@ function updateDemoBar(activeType: DemoScenarioType): void {
     const el = btn as HTMLElement
     el.classList.toggle('active', el.dataset.scenario === activeType)
   })
+
+  // Auto-show station legend briefly when demo starts
+  if (stationLegend) {
+    stationLegend.autoShow(8000)
+  }
 }
 
 function hideDemoBar(): void {
   document.getElementById('demo-bar')?.classList.add('hidden')
+  document.getElementById('demo-phase')?.classList.remove('visible')
+  document.getElementById('demo-progress')?.classList.remove('visible')
+  stationLegend?.hide()
 }
 
 function setupDemoBar(): void {
@@ -2591,6 +2642,15 @@ function setupDemoBar(): void {
     })
     container.appendChild(btn)
   }
+
+  // Legend toggle button
+  const legendBtn = document.getElementById('demo-legend-btn')
+  legendBtn?.addEventListener('click', () => {
+    if (stationLegend) {
+      stationLegend.toggle()
+      legendBtn.classList.toggle('active', stationLegend.isVisible())
+    }
+  })
 }
 
 // ============================================================================
@@ -3414,6 +3474,23 @@ function init() {
   setupReplayBar()
   setupReplayModal()
   setupReplayPicker() // async, non-blocking
+
+  // Initialize station legend for demo mode
+  stationLegend = new StationLegend()
+  stationLegend.setScene(state.scene!)
+
+  // L key toggles station legend during demo mode
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'l' || e.key === 'L') {
+      const inInput = ['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement?.tagName ?? ''))
+      if (!inInput && isDemoMode() && stationLegend) {
+        e.preventDefault()
+        stationLegend.toggle()
+        const legendBtn = document.getElementById('demo-legend-btn')
+        legendBtn?.classList.toggle('active', stationLegend.isVisible())
+      }
+    }
+  })
 
   // Setup voice input
   // On vibecraft.sh: voice is always available via cloud proxy, set up immediately

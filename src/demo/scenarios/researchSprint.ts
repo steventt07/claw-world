@@ -12,7 +12,7 @@
  */
 
 import type { ManagedSession } from '../../../shared/types'
-import type { DemoScenario, DemoScenarioBundle } from '../types'
+import type { DemoEducation, DemoScenario, DemoScenarioBundle } from '../types'
 import { SPEED, DEMO_CWD, nextToolUseId, timedToolPair, toSteps, type TimedEvent } from '../helpers'
 
 // ============================================================================
@@ -55,6 +55,8 @@ function createResearchScenario(): DemoScenario {
   all.push({
     time: 0,
     event: { type: 'user_prompt_submit', sessionId: SID, cwd: DEMO_CWD, prompt: 'Research WebSocket best practices and implement a real-time notification system' },
+    phase: { name: 'Scoping', description: 'Understanding the problem space and existing code' },
+    narration: { text: 'The researcher begins by understanding the project and scoping what needs to be built.', duration: 5000 },
   })
 
   // --- Initial scoping phase ---
@@ -85,19 +87,23 @@ function createResearchScenario(): DemoScenario {
 
   // --- Spawn 2 parallel research sub-agents ---
 
-  all.push({ time: 9500, event: { type: 'pre_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Research official WebSocket docs and specs', prompt: 'Deep-dive into WebSocket API docs (MDN), ws library README, and RFC 6455. Focus on: connection lifecycle, error handling, heartbeat/ping-pong, binary frames, and security (WSS, origin checks)', subagent_type: 'general-purpose' }, toolUseId: taskDocsId, assistantText: "Spawning a sub-agent to deep-dive into official docs and specs." } })
+  all.push({ time: 9500, event: { type: 'pre_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Research official WebSocket docs and specs', prompt: 'Deep-dive into WebSocket API docs (MDN), ws library README, and RFC 6455. Focus on: connection lifecycle, error handling, heartbeat/ping-pong, binary frames, and security (WSS, origin checks)', subagent_type: 'general-purpose' }, toolUseId: taskDocsId, assistantText: "Spawning a sub-agent to deep-dive into official docs and specs." }, phase: { name: 'Spawn Researchers', description: 'Launching parallel research sub-agents' }, narration: { text: 'Two research sub-agents spawn to explore official docs and community examples simultaneously.', duration: 6000 } })
 
   all.push({ time: 11000, event: { type: 'pre_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Find real-world WebSocket examples', prompt: 'Search for production WebSocket patterns: reconnection strategies, message queuing, room/topic subscriptions, scaling with Redis pub/sub. Find code examples from open-source projects', subagent_type: 'general-purpose' }, toolUseId: taskExamplesId, assistantText: "Another sub-agent will find real-world examples and community patterns." } })
 
   // --- Researcher continues reading local code while sub-agents research ---
 
-  all.push(...timedToolPair({
-    sessionId: SID, tool: 'Grep',
-    toolInput: { pattern: 'socket|realtime|notification|event-stream', path: 'server/' },
-    toolResponse: { matches: ['server/routes/events.ts:3: // SSE endpoint (deprecated)', 'server/services/notifications.ts:8'] },
-    preTime: 12500, postTime: 13200,
-    assistantText: "Checking if there's existing WebSocket or SSE code to build on.",
-  }))
+  {
+    const [pre, post] = timedToolPair({
+      sessionId: SID, tool: 'Grep',
+      toolInput: { pattern: 'socket|realtime|notification|event-stream', path: 'server/' },
+      toolResponse: { matches: ['server/routes/events.ts:3: // SSE endpoint (deprecated)', 'server/services/notifications.ts:8'] },
+      preTime: 12500, postTime: 13200,
+      assistantText: "Checking if there's existing WebSocket or SSE code to build on.",
+    })
+    pre.phase = { name: 'Local Exploration', description: 'Main researcher explores local code while sub-agents research online' }
+    all.push(pre, post)
+  }
 
   all.push(...timedToolPair({
     sessionId: SID, tool: 'Read',
@@ -125,18 +131,22 @@ function createResearchScenario(): DemoScenario {
 
   // --- Sub-agents report back ---
 
-  all.push({ time: 23000, event: { type: 'post_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Research official WebSocket docs and specs' }, toolResponse: { result: 'Key findings: Use ws library (fastest Node.js impl), implement ping/pong heartbeat every 30s, handle close codes (1000=normal, 1006=abnormal), use WSS in prod, validate Origin header. Binary frames not needed for JSON notifications.' }, toolUseId: taskDocsId, success: true, duration: 13500 } })
+  all.push({ time: 23000, event: { type: 'post_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Research official WebSocket docs and specs' }, toolResponse: { result: 'Key findings: Use ws library (fastest Node.js impl), implement ping/pong heartbeat every 30s, handle close codes (1000=normal, 1006=abnormal), use WSS in prod, validate Origin header. Binary frames not needed for JSON notifications.' }, toolUseId: taskDocsId, success: true, duration: 13500 }, phase: { name: 'Synthesis', description: 'Combining research findings from all sources' }, narration: { text: 'Research is complete. The main agent synthesizes all findings and begins building.', duration: 5000 } })
 
   all.push({ time: 25000, event: { type: 'post_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Find real-world WebSocket examples' }, toolResponse: { result: 'Best patterns found: Exponential backoff reconnection (100ms→30s cap), message queue during disconnect, topic-based subscriptions via JSON { type, topic, data }, Redis pub/sub for horizontal scaling. Reference: Socket.IO internals, Liveblocks architecture.' }, toolUseId: taskExamplesId, success: true, duration: 14000 } })
 
   // --- Build phase: synthesize research and implement ---
 
-  all.push(...timedToolPair({
-    sessionId: SID, tool: 'Write',
-    toolInput: { file_path: 'server/websocket/NotificationServer.ts', content: '// WebSocket server with heartbeat, reconnection, topic subscriptions...' },
-    preTime: 26500, postTime: 27800,
-    assistantText: "Creating the WebSocket server using patterns from both research agents.",
-  }))
+  {
+    const [pre, post] = timedToolPair({
+      sessionId: SID, tool: 'Write',
+      toolInput: { file_path: 'server/websocket/NotificationServer.ts', content: '// WebSocket server with heartbeat, reconnection, topic subscriptions...' },
+      preTime: 26500, postTime: 27800,
+      assistantText: "Creating the WebSocket server using patterns from both research agents.",
+    })
+    pre.phase = { name: 'Build', description: 'Implementing the solution based on research' }
+    all.push(pre, post)
+  }
 
   all.push(...timedToolPair({
     sessionId: SID, tool: 'Write',
@@ -287,5 +297,26 @@ export function createResearchSprintBundle(): DemoScenarioBundle {
     managedSessions: createManagedSessions(),
     sessionIds: SESSION_IDS,
     managedIds: MANAGED_IDS,
+    education: {
+      intro: {
+        title: 'Research Sprint',
+        description: 'A developer needs to implement a new feature but first needs to research the best approach. Two sub-agents research official docs and community examples in parallel while the main agent explores the local codebase.',
+        watchFor: [
+          'Two research sub-agents using WebFetch and WebSearch at the antenna station',
+          'Main researcher reading local files at the bookshelf while sub-agents research online',
+          'Research results being synthesized into an implementation plan',
+          'Transition from research phase to active building',
+        ],
+        agentCount: { orchestrators: 1, subagents: 2 },
+      },
+      summary: {
+        achievements: [
+          'Official documentation and API specs researched',
+          'Community patterns and best practices gathered',
+          'Complete implementation built from research findings',
+        ],
+        parallelTimeSaved: '~40s saved vs sequential research',
+      },
+    },
   }
 }

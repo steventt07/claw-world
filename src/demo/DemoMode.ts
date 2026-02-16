@@ -8,8 +8,9 @@
  */
 
 import type { ClaudeEvent, ManagedSession } from '../../shared/types'
-import type { DemoScenario, DemoScenarioBundle, DemoScenarioType } from './types'
+import type { DemoScenario, DemoScenarioBundle, DemoScenarioType, DemoEducation } from './types'
 import { createScenarioBundle } from './scenarios'
+import { computeScenarioDuration, computePhaseSegments } from './helpers'
 
 // ============================================================================
 // Types
@@ -24,6 +25,20 @@ export interface DemoModeConfig {
   deleteZone?: (sessionId: string) => void
   /** Launch a spawn beam arc from one session's portal to another session's zone */
   spawnBeam?: (from: string, to: string) => void
+  /** Enable follow-active camera mode for multi-zone demos */
+  enableFollowActive?: () => void
+  /** Force camera focus to a specific session's zone */
+  focusZone?: (sessionId: string) => void
+  /** Update the phase banner with current phase */
+  updatePhase?: (name: string, description: string) => void
+  /** Show a narration toast */
+  showNarration?: (text: string, duration?: number) => void
+  /** Report playback progress (0-1) and current phase name */
+  onProgress?: (percent: number, phaseName: string) => void
+  /** Show intro card before scenario starts */
+  showIntroCard?: (intro: DemoEducation['intro']) => Promise<void>
+  /** Show summary card at cycle end */
+  showSummaryCard?: (summary: DemoEducation['summary']) => void
 }
 
 export interface DemoModeOptions {
@@ -33,6 +48,8 @@ export interface DemoModeOptions {
   bundle?: DemoScenarioBundle
   /** Callback when all steps finish (for non-looping bundles) */
   onComplete?: () => void
+  /** Skip the intro card (e.g. when switching scenarios) */
+  skipIntro?: boolean
 }
 
 // ============================================================================
@@ -96,11 +113,35 @@ export function startDemoMode(
   // Add CSS class for DEMO badge
   document.body.classList.add('demo-mode')
 
-  // Start each scenario with staggered timing
+  // Enable follow-active camera for multi-zone demos
+  config.enableFollowActive?.()
+
+  // Pre-compute duration and phase segments for each scenario
+  for (const scenario of bundle.scenarios) {
+    scenario.totalDuration = computeScenarioDuration(scenario.steps)
+    scenario.phases = computePhaseSegments(scenario.steps)
+  }
+
+  // Determine intro delay (show intro card before scenarios start)
+  const showIntro = !options?.skipIntro && bundle.education?.intro
+  const introDelay = showIntro ? 5000 : 0
+
+  // Show intro card if available
+  if (showIntro && config.showIntroCard) {
+    config.showIntroCard(bundle.education!.intro)
+  }
+
+  // Initialize progress bar phase segments from the first scenario with phases
+  const primaryScenario = bundle.scenarios.find(s => s.phases && s.phases.length > 0) ?? bundle.scenarios[0]
+  if (primaryScenario?.phases && config.onProgress) {
+    config.onProgress(0, primaryScenario.phases[0]?.name ?? '')
+  }
+
+  // Start each scenario with staggered timing (+ intro delay)
   for (const scenario of bundle.scenarios) {
     const timer = setTimeout(() => {
-      runScenario(scenario, config)
-    }, scenario.initialDelay)
+      runScenario(scenario, config, bundle)
+    }, scenario.initialDelay + introDelay)
     _timers.push(timer)
   }
 
@@ -121,6 +162,10 @@ export function stopDemoMode(): void {
   // Remove CSS class
   document.body.classList.remove('demo-mode')
 
+  // Hide phase banner and progress bar
+  document.getElementById('demo-phase')?.classList.remove('visible')
+  document.getElementById('demo-progress')?.classList.remove('visible')
+
   _isDemoMode = false
   _isExplicitDemo = false
   _isReplayMode = false
@@ -133,10 +178,13 @@ export function stopDemoMode(): void {
 // ============================================================================
 
 /** Run a single scenario's cycles in a loop */
-function runScenario(scenario: DemoScenario, config: DemoModeConfig): void {
+function runScenario(scenario: DemoScenario, config: DemoModeConfig, bundle?: DemoScenarioBundle): void {
   if (!_isDemoMode) return
 
   let cumulativeDelay = 0
+  let currentPhaseName = ''
+  // Track cumulative step delay for progress (not jittered)
+  let nominalElapsed = 0
 
   for (let i = 0; i < scenario.steps.length; i++) {
     const step = scenario.steps[i]
@@ -144,9 +192,36 @@ function runScenario(scenario: DemoScenario, config: DemoModeConfig): void {
     // Add jitter: ±20% of the step delay
     const jitter = step.delay * (0.8 + Math.random() * 0.4)
     cumulativeDelay += jitter
+    nominalElapsed += step.delay
+
+    // Capture nominal elapsed for progress callback
+    const stepElapsed = nominalElapsed
 
     const timer = setTimeout(() => {
       if (!_isDemoMode) return
+
+      // Process phase transition
+      if (step.phase) {
+        currentPhaseName = step.phase.name
+        config.updatePhase?.(step.phase.name, step.phase.description)
+      }
+
+      // Process narration
+      if (step.narration) {
+        config.showNarration?.(step.narration.text, step.narration.duration)
+      }
+
+      // Process camera focus
+      if (step.focusZone) {
+        config.focusZone?.(step.focusZone)
+      }
+
+      // Report progress (only for the first scenario in the bundle to avoid conflicts)
+      const isPrimary = !bundle || bundle.scenarios[0] === scenario
+      if (isPrimary && scenario.totalDuration && scenario.totalDuration > 0) {
+        const percent = Math.min(1, stepElapsed / scenario.totalDuration)
+        config.onProgress?.(percent, currentPhaseName)
+      }
 
       // Stamp event with unique id and current timestamp
       const event = {
@@ -191,11 +266,21 @@ function runScenario(scenario: DemoScenario, config: DemoModeConfig): void {
     return
   }
 
-  // After all steps complete, schedule the next cycle
+  // At cycle end, show summary card if available (only for first scenario in the bundle)
   const nextCycleDelay = cumulativeDelay + scenario.cyclePause
+  const isFirstScenario = bundle?.scenarios?.[0] === scenario
+  if (isFirstScenario && bundle?.education?.summary && config.showSummaryCard) {
+    const summaryTimer = setTimeout(() => {
+      if (!_isDemoMode) return
+      config.showSummaryCard!(bundle.education!.summary)
+    }, cumulativeDelay + 500)
+    _timers.push(summaryTimer)
+  }
+
+  // After all steps complete, schedule the next cycle
   const timer = setTimeout(() => {
     if (!_isDemoMode) return
-    runScenario(scenario, config)
+    runScenario(scenario, config, bundle)
   }, nextCycleDelay)
   _timers.push(timer)
 }

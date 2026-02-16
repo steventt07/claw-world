@@ -11,7 +11,7 @@ import type { DemoEvent, DemoStep } from './types'
 // ============================================================================
 
 /** Speed multiplier — all absolute times are divided by this */
-export const SPEED = 2
+export const SPEED = 1
 
 export const DEMO_CWD = '/home/user/project'
 
@@ -41,6 +41,12 @@ export interface TimedEvent {
   deleteZone?: string
   /** Optional: launch a spawn beam arc from one session's portal to another session's zone */
   spawnBeam?: { from: string; to: string }
+  /** Optional: mark a phase transition at this event */
+  phase?: { name: string; description: string }
+  /** Optional: show narration text at this event */
+  narration?: { text: string; duration?: number }
+  /** Optional: force camera focus to a session's zone */
+  focusZone?: string
 }
 
 /** Convert absolute-time events to relative-delay steps (sorted chronologically) */
@@ -55,8 +61,46 @@ export function toSteps(events: TimedEvent[]): DemoStep[] {
       event: e.event,
       ...(e.deleteZone ? { deleteZone: e.deleteZone } : {}),
       ...(e.spawnBeam ? { spawnBeam: e.spawnBeam } : {}),
+      ...(e.phase ? { phase: e.phase } : {}),
+      ...(e.narration ? { narration: e.narration } : {}),
+      ...(e.focusZone ? { focusZone: e.focusZone } : {}),
     }
   })
+}
+
+// ============================================================================
+// Duration & Phase Computation
+// ============================================================================
+
+/** Compute total duration of a set of steps (sum of all delays) */
+export function computeScenarioDuration(steps: DemoStep[]): number {
+  return steps.reduce((sum, s) => sum + s.delay, 0)
+}
+
+/** Derive phase segments with percentage positions from steps that have phase markers */
+export function computePhaseSegments(steps: DemoStep[]): Array<{ name: string; startPercent: number; endPercent: number }> {
+  const totalDuration = computeScenarioDuration(steps)
+  if (totalDuration === 0) return []
+
+  const segments: Array<{ name: string; startPercent: number; endPercent: number }> = []
+  let elapsed = 0
+
+  for (const step of steps) {
+    if (step.phase) {
+      // Close previous segment
+      if (segments.length > 0) {
+        segments[segments.length - 1].endPercent = elapsed / totalDuration
+      }
+      segments.push({
+        name: step.phase.name,
+        startPercent: elapsed / totalDuration,
+        endPercent: 1, // Will be overwritten by next phase or end
+      })
+    }
+    elapsed += step.delay
+  }
+
+  return segments
 }
 
 /** Create a pre/post tool pair as two TimedEvents at absolute times */

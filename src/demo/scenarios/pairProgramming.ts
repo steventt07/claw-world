@@ -11,7 +11,7 @@
  */
 
 import type { ManagedSession } from '../../../shared/types'
-import type { DemoScenario, DemoScenarioBundle } from '../types'
+import type { DemoEducation, DemoScenario, DemoScenarioBundle } from '../types'
 import { SPEED, DEMO_CWD, nextToolUseId, timedToolPair, toSteps, type TimedEvent } from '../helpers'
 
 // ============================================================================
@@ -56,6 +56,8 @@ function createAliceScenario(): DemoScenario {
   all.push({
     time: 0,
     event: { type: 'user_prompt_submit', sessionId: SID_ALICE, cwd: DEMO_CWD + '/src', prompt: 'Build a dashboard page with a data table component and chart widget' },
+    phase: { name: 'Setup', description: 'Alice and Bob start their tasks in parallel' },
+    narration: { text: 'Alice and Bob work side by side, each tackling their own feature.', duration: 5000 },
   })
 
   // Read existing component structure
@@ -68,7 +70,7 @@ function createAliceScenario(): DemoScenario {
   all.push(...timedToolPair({ sessionId: SID_ALICE, tool: 'Write', toolInput: { file_path: 'src/components/DataTable.tsx', content: '// DataTable component with sorting, filtering...' }, preTime: 6000, postTime: 7200, assistantText: "Creating the DataTable component with sorting and pagination." }))
 
   // Spawn sub-agent for component tests
-  all.push({ time: 8500, event: { type: 'pre_tool_use' as const, sessionId: SID_ALICE, cwd: DEMO_CWD + '/src', tool: 'Task', toolInput: { description: 'Write component tests for DataTable', prompt: 'Write comprehensive tests for the DataTable component: rendering, sorting, filtering, pagination, empty states', subagent_type: 'general-purpose' }, toolUseId: taskTestsId, assistantText: "I'll delegate the test writing to a sub-agent while I continue building." } })
+  all.push({ time: 8500, event: { type: 'pre_tool_use' as const, sessionId: SID_ALICE, cwd: DEMO_CWD + '/src', tool: 'Task', toolInput: { description: 'Write component tests for DataTable', prompt: 'Write comprehensive tests for the DataTable component: rendering, sorting, filtering, pagination, empty states', subagent_type: 'general-purpose' }, toolUseId: taskTestsId, assistantText: "I'll delegate the test writing to a sub-agent while I continue building." }, phase: { name: 'Delegation', description: 'Each developer delegates a side-task to a sub-agent' }, narration: { text: 'Alice delegates her tests to a sub-agent so she can keep building components.', duration: 5000 } })
 
   // Alice continues building while tests are being written
   all.push(...timedToolPair({ sessionId: SID_ALICE, tool: 'Write', toolInput: { file_path: 'src/components/ChartWidget.tsx', content: '// Chart widget with recharts integration...' }, preTime: 10000, postTime: 11200, assistantText: "Building the chart widget while the test agent works." }))
@@ -80,7 +82,7 @@ function createAliceScenario(): DemoScenario {
   all.push(...timedToolPair({ sessionId: SID_ALICE, tool: 'Edit', toolInput: { file_path: 'src/routes/index.tsx', old_string: '<Route path="/settings"', new_string: '<Route path="/dashboard" element={<Dashboard />} />\n      <Route path="/settings"' }, preTime: 17000, postTime: 17500, assistantText: "Adding the dashboard route." }))
 
   // Sub-agent finishes
-  all.push({ time: 22000, event: { type: 'post_tool_use' as const, sessionId: SID_ALICE, cwd: DEMO_CWD + '/src', tool: 'Task', toolInput: { description: 'Write component tests for DataTable' }, toolResponse: { result: '8 tests written and passing for DataTable: rendering, sorting, filtering, pagination, empty states' }, toolUseId: taskTestsId, success: true, duration: 13500 } })
+  all.push({ time: 22000, event: { type: 'post_tool_use' as const, sessionId: SID_ALICE, cwd: DEMO_CWD + '/src', tool: 'Task', toolInput: { description: 'Write component tests for DataTable' }, toolResponse: { result: '8 tests written and passing for DataTable: rendering, sorting, filtering, pagination, empty states' }, toolUseId: taskTestsId, success: true, duration: 13500 }, phase: { name: 'Results', description: 'Reviewing and finishing up' } })
 
   // Alice reviews tests and finishes
   all.push(...timedToolPair({ sessionId: SID_ALICE, tool: 'Read', toolInput: { file_path: 'src/__tests__/DataTable.test.tsx' }, toolResponse: { content: '// 8 comprehensive tests...' }, preTime: 22500, postTime: 23200, assistantText: "Test agent finished! Let me review what it wrote." }))
@@ -95,7 +97,7 @@ function createAliceScenario(): DemoScenario {
   })
 
   // SUB-AGENT: Test Writer
-  all.push({ time: 9000, event: { type: 'user_prompt_submit', sessionId: SID_ALICE_TESTS, cwd: DEMO_CWD + '/src/__tests__', prompt: 'Write comprehensive tests for the DataTable component: rendering, sorting, filtering, pagination, empty states' }, spawnBeam: { from: SID_ALICE, to: SID_ALICE_TESTS } })
+  all.push({ time: 9000, event: { type: 'user_prompt_submit', sessionId: SID_ALICE_TESTS, cwd: DEMO_CWD + '/src/__tests__', prompt: 'Write comprehensive tests for the DataTable component: rendering, sorting, filtering, pagination, empty states' }, spawnBeam: { from: SID_ALICE, to: SID_ALICE_TESTS }, narration: { text: 'Sub-agents spawn in new zones and work independently.', duration: 5000 } })
   all.push(...timedToolPair({ sessionId: SID_ALICE_TESTS, tool: 'Read', toolInput: { file_path: 'src/components/DataTable.tsx' }, toolResponse: { content: '// DataTable component with sorting, filtering...' }, preTime: 10500, postTime: 11200, assistantText: "Reading the component to understand its props and behavior." }))
   all.push(...timedToolPair({ sessionId: SID_ALICE_TESTS, tool: 'Glob', toolInput: { pattern: 'src/__tests__/**/*.test.tsx' }, toolResponse: { matches: ['src/__tests__/UserList.test.tsx'] }, preTime: 12500, postTime: 13000, assistantText: "Checking existing test patterns to follow." }))
   all.push(...timedToolPair({ sessionId: SID_ALICE_TESTS, tool: 'Read', toolInput: { file_path: 'src/__tests__/UserList.test.tsx' }, toolResponse: { content: '// Existing test with testing-library...' }, preTime: 14000, postTime: 14700, assistantText: "Reading existing tests for conventions." }))
@@ -186,5 +188,26 @@ export function createPairProgrammingBundle(): DemoScenarioBundle {
     managedSessions: createManagedSessions(),
     sessionIds: SESSION_IDS,
     managedIds: MANAGED_IDS,
+    education: {
+      intro: {
+        title: 'Pair Programming',
+        description: 'Alice builds frontend components while Bob handles the backend API. Each delegates a tedious side-task (tests, docs) to a sub-agent so they can stay focused on building.',
+        watchFor: [
+          'Two developers working in parallel on different features',
+          'Each developer spawning a sub-agent for side-tasks',
+          'Sub-agents handling tests and documentation automatically',
+          'Main developers continuing to build while sub-agents work',
+        ],
+        agentCount: { orchestrators: 2, subagents: 2 },
+      },
+      summary: {
+        achievements: [
+          'Dashboard with DataGrid, FilterBar, and ExportButton',
+          'REST API with pagination, filtering, and rate limiting',
+          'Component tests and OpenAPI documentation generated in parallel',
+        ],
+        parallelTimeSaved: '~30s saved vs sequential execution',
+      },
+    },
   }
 }

@@ -18,6 +18,12 @@ export interface DemoStep {
   deleteZone?: string
   /** Optional: launch a spawn beam arc from one session's portal to another session's zone */
   spawnBeam?: { from: string; to: string }
+  /** Optional: mark a phase transition at this step */
+  phase?: { name: string; description: string }
+  /** Optional: show narration text at this step */
+  narration?: { text: string; duration?: number }
+  /** Optional: force camera focus to this session's zone */
+  focusZone?: string
 }
 
 /** A full demo scenario with metadata and repeating cycles */
@@ -31,10 +37,28 @@ export interface DemoScenario {
   initialDelay: number
   /** Steps for one complete work cycle */
   steps: DemoStep[]
+  /** Total duration of all steps (ms), computed from delays */
+  totalDuration?: number
+  /** Phase segments with percentage positions, computed from steps */
+  phases?: Array<{ name: string; startPercent: number; endPercent: number }>
 }
 
 /** Available demo scenario types */
 export type DemoScenarioType = 'swarm' | 'pair' | 'research' | 'review'
+
+/** Educational metadata for demo intro/summary cards */
+export interface DemoEducation {
+  intro: {
+    title: string
+    description: string
+    watchFor: string[]
+    agentCount: { orchestrators: number; subagents: number }
+  }
+  summary: {
+    achievements: string[]
+    parallelTimeSaved?: string
+  }
+}
 
 /** A complete bundle of everything DemoMode needs to run a scenario type */
 export interface DemoScenarioBundle {
@@ -42,4 +66,6 @@ export interface DemoScenarioBundle {
   managedSessions: ManagedSession[]
   sessionIds: readonly string[]
   managedIds: readonly string[]
+  /** Educational content for intro/summary cards */
+  education?: DemoEducation
 }

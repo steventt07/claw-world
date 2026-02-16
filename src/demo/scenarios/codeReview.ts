@@ -13,7 +13,7 @@
  */
 
 import type { ManagedSession } from '../../../shared/types'
-import type { DemoScenario, DemoScenarioBundle } from '../types'
+import type { DemoEducation, DemoScenario, DemoScenarioBundle } from '../types'
 import { SPEED, DEMO_CWD, nextToolUseId, timedToolPair, toSteps, type TimedEvent } from '../helpers'
 
 // ============================================================================
@@ -60,6 +60,8 @@ function createReviewScenario(): DemoScenario {
   all.push({
     time: 0,
     event: { type: 'user_prompt_submit', sessionId: SID, cwd: DEMO_CWD, prompt: 'Do a comprehensive review of the auth module: security, test coverage, and dependency health' },
+    phase: { name: 'Initial Read', description: 'Reading the codebase to understand what needs review' },
+    narration: { text: 'The reviewer starts by reading through the codebase to understand the code structure.', duration: 5000 },
   })
 
   // --- Initial read phase ---
@@ -90,7 +92,7 @@ function createReviewScenario(): DemoScenario {
 
   // --- Spawn 3 analysis sub-agents in quick succession ---
 
-  all.push({ time: 8000, event: { type: 'pre_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Scan for security vulnerabilities', prompt: 'Scan src/auth/ and src/db/ for XSS (innerHTML, eval), SQL injection (template literals in queries), insecure cookies, and missing input validation', subagent_type: 'general-purpose' }, toolUseId: taskSecurityId, assistantText: "Spawning a security scanner to check for vulnerabilities." } })
+  all.push({ time: 8000, event: { type: 'pre_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Scan for security vulnerabilities', prompt: 'Scan src/auth/ and src/db/ for XSS (innerHTML, eval), SQL injection (template literals in queries), insecure cookies, and missing input validation', subagent_type: 'general-purpose' }, toolUseId: taskSecurityId, assistantText: "Spawning a security scanner to check for vulnerabilities." }, phase: { name: 'Spawn Scanners', description: 'Launching parallel analysis sub-agents' }, narration: { text: 'Three specialized scanners spawn to check security, test coverage, and dependencies in parallel.', duration: 6000 } })
 
   all.push({ time: 9500, event: { type: 'pre_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Check test coverage gaps', prompt: 'Analyze which auth functions have tests and which are missing. Check for edge cases: expired tokens, invalid passwords, rate limiting', subagent_type: 'general-purpose' }, toolUseId: taskCoverageId, assistantText: "Spawning a coverage checker to find untested code paths." } })
 
@@ -98,13 +100,17 @@ function createReviewScenario(): DemoScenario {
 
   // --- Reviewer continues reading while sub-agents work ---
 
-  all.push(...timedToolPair({
-    sessionId: SID, tool: 'Read',
-    toolInput: { file_path: 'src/auth/session.ts' },
-    toolResponse: { content: '// Session management...' },
-    preTime: 12500, postTime: 13200,
-    assistantText: "Reviewing session handling while the sub-agents scan.",
-  }))
+  {
+    const pair = timedToolPair({
+      sessionId: SID, tool: 'Read',
+      toolInput: { file_path: 'src/auth/session.ts' },
+      toolResponse: { content: '// Session management...' },
+      preTime: 12500, postTime: 13200,
+      assistantText: "Reviewing session handling while the sub-agents scan.",
+    })
+    pair[0].phase = { name: 'Parallel Analysis', description: 'Sub-agents scan while reviewer reads more code' }
+    all.push(...pair)
+  }
 
   all.push(...timedToolPair({
     sessionId: SID, tool: 'Read',
@@ -124,7 +130,7 @@ function createReviewScenario(): DemoScenario {
 
   // --- Sub-agents report back ---
 
-  all.push({ time: 22000, event: { type: 'post_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Scan for security vulnerabilities' }, toolResponse: { result: 'Found 3 issues: SQL injection in db/queries.ts:23, XSS in auth/error-page.ts:15 (innerHTML), insecure cookies in session.ts (missing httpOnly/secure)' }, toolUseId: taskSecurityId, success: true, duration: 14000 } })
+  all.push({ time: 22000, event: { type: 'post_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Scan for security vulnerabilities' }, toolResponse: { result: 'Found 3 issues: SQL injection in db/queries.ts:23, XSS in auth/error-page.ts:15 (innerHTML), insecure cookies in session.ts (missing httpOnly/secure)' }, toolUseId: taskSecurityId, success: true, duration: 14000 }, phase: { name: 'Fix Phase', description: 'Applying fixes based on scanner findings' }, narration: { text: 'Scanners report their findings and the reviewer applies targeted fixes.', duration: 5000 } })
 
   all.push({ time: 24000, event: { type: 'post_tool_use' as const, sessionId: SID, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Check test coverage gaps' }, toolResponse: { result: 'Coverage gaps: no tests for token refresh, missing edge case for expired JWT, no rate-limit tests. 4 functions untested.' }, toolUseId: taskCoverageId, success: true, duration: 14500 } })
 
@@ -165,13 +171,17 @@ function createReviewScenario(): DemoScenario {
     assistantText: "Hardening session cookies per security scanner findings.",
   }))
 
-  all.push(...timedToolPair({
-    sessionId: SID, tool: 'Bash',
-    toolInput: { command: 'npm install jsonwebtoken@latest && npx vitest run src/auth/ src/db/' },
-    toolResponse: { stdout: 'updated jsonwebtoken to 9.0.2\nPASS  src/auth/ (4 tests)\nPASS  src/db/ (5 tests)\n\nTests: 9 passed, 9 total' },
-    preTime: 33500, postTime: 36500,
-    assistantText: "Updating vulnerable jsonwebtoken and running tests to verify fixes.",
-  }))
+  {
+    const pair = timedToolPair({
+      sessionId: SID, tool: 'Bash',
+      toolInput: { command: 'npm install jsonwebtoken@latest && npx vitest run src/auth/ src/db/' },
+      toolResponse: { stdout: 'updated jsonwebtoken to 9.0.2\nPASS  src/auth/ (4 tests)\nPASS  src/db/ (5 tests)\n\nTests: 9 passed, 9 total' },
+      preTime: 33500, postTime: 36500,
+      assistantText: "Updating vulnerable jsonwebtoken and running tests to verify fixes.",
+    })
+    pair[0].phase = { name: 'Verify', description: 'Running final checks to confirm all issues resolved' }
+    all.push(...pair)
+  }
 
   all.push({
     time: 38000,
@@ -334,5 +344,26 @@ export function createCodeReviewBundle(): DemoScenarioBundle {
     managedSessions: createManagedSessions(),
     sessionIds: SESSION_IDS,
     managedIds: MANAGED_IDS,
+    education: {
+      intro: {
+        title: 'Code Review',
+        description: 'A code reviewer reads through the codebase, then spawns three specialized scanners to check security vulnerabilities, test coverage gaps, and dependency issues in parallel.',
+        watchFor: [
+          'Three analysis sub-agents spawning simultaneously',
+          'Each scanner using different tools (Grep for security, Bash for tests, WebFetch for deps)',
+          'Reviewer applying fixes while scanners are still working',
+          'Scanner zones disappearing as each finishes its analysis',
+        ],
+        agentCount: { orchestrators: 1, subagents: 3 },
+      },
+      summary: {
+        achievements: [
+          'Security vulnerabilities identified and patched',
+          'Test coverage gaps found and new tests written',
+          'Dependency audit completed with updates applied',
+        ],
+        parallelTimeSaved: '~45s saved vs sequential scanning',
+      },
+    },
   }
 }

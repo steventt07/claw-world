@@ -8,7 +8,7 @@
  */
 
 import type { ManagedSession } from '../../../shared/types'
-import type { DemoScenario, DemoScenarioBundle } from '../types'
+import type { DemoEducation, DemoScenario, DemoScenarioBundle } from '../types'
 import { SPEED, DEMO_CWD, nextToolUseId, timedToolPair, toSteps, type TimedEvent } from '../helpers'
 
 // ============================================================================
@@ -92,6 +92,8 @@ function createArchitectScenario(): DemoScenario {
   all.push({
     time: 0,
     event: { type: 'user_prompt_submit', sessionId: SID_ARCH, cwd: DEMO_CWD, prompt: 'Build a complete authentication system with OAuth, JWT, and tests' },
+    phase: { name: 'Planning', description: 'Reading codebase and researching best practices' },
+    narration: { text: 'The Architect begins by understanding the codebase before delegating work to specialized sub-agents.', duration: 5000 },
   })
 
   all.push(...timedToolPair({ sessionId: SID_ARCH, tool: 'Read', toolInput: { file_path: 'src/index.ts' }, toolResponse: { content: '// Main entry point...' }, preTime: 1500, postTime: 2300, assistantText: "Let me understand the project structure before planning the implementation." }))
@@ -101,19 +103,19 @@ function createArchitectScenario(): DemoScenario {
 
   // Phase 2: Spawn sub-agents
 
-  all.push({ time: 11500, event: { type: 'pre_tool_use' as const, sessionId: SID_ARCH, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Implement OAuth backend routes', prompt: 'Create OAuth 2.0 routes with Google/GitHub providers, token refresh, and PKCE flow', subagent_type: 'general-purpose' }, toolUseId: taskOAuthId, assistantText: "I'll delegate the OAuth backend to a sub-agent." } })
+  all.push({ time: 11500, event: { type: 'pre_tool_use' as const, sessionId: SID_ARCH, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Implement OAuth backend routes', prompt: 'Create OAuth 2.0 routes with Google/GitHub providers, token refresh, and PKCE flow', subagent_type: 'general-purpose' }, toolUseId: taskOAuthId, assistantText: "I'll delegate the OAuth backend to a sub-agent." }, phase: { name: 'Delegation', description: 'Spawning sub-agents for parallel work' }, narration: { text: 'Watch the portal station light up as sub-agents spawn into their own zones.', duration: 5000 } })
   all.push({ time: 13000, event: { type: 'pre_tool_use' as const, sessionId: SID_ARCH, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Build login/signup UI components', prompt: 'Create React login form, signup form, OAuth buttons, and password reset flow', subagent_type: 'general-purpose' }, toolUseId: taskUIId, assistantText: "Another sub-agent will handle the frontend UI." } })
   all.push({ time: 14500, event: { type: 'pre_tool_use' as const, sessionId: SID_ARCH, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Write auth integration tests', prompt: 'Write comprehensive tests for OAuth flow, JWT validation, and session management', subagent_type: 'general-purpose' }, toolUseId: taskTestsId, assistantText: "A third sub-agent will write integration tests in parallel." } })
 
   // Phase 3: Architect continues
 
-  all.push(...timedToolPair({ sessionId: SID_ARCH, tool: 'Write', toolInput: { file_path: 'src/config/auth.ts', content: '// Auth config...' }, preTime: 16500, postTime: 17000, assistantText: "While the sub-agents work, I'll set up the shared auth config." }))
+  { const [pre, post] = timedToolPair({ sessionId: SID_ARCH, tool: 'Write', toolInput: { file_path: 'src/config/auth.ts', content: '// Auth config...' }, preTime: 16500, postTime: 17000, assistantText: "While the sub-agents work, I'll set up the shared auth config." }); all.push({ ...pre, phase: { name: 'Parallel Work', description: 'Architect continues while sub-agents build' } }, post) }
   all.push(...timedToolPair({ sessionId: SID_ARCH, tool: 'Edit', toolInput: { file_path: 'src/index.ts', old_string: "import { router } from './routes'", new_string: "import { router } from './routes'\nimport { authMiddleware } from './middleware/auth'" }, preTime: 18500, postTime: 18900, assistantText: "I'll wire up the auth middleware in the main entry point." }))
   all.push(...timedToolPair({ sessionId: SID_ARCH, tool: 'Bash', toolInput: { command: 'npm install jsonwebtoken bcrypt passport passport-google-oauth20' }, toolResponse: { stdout: 'added 5 packages in 3.1s' }, preTime: 20000, postTime: 22500, assistantText: "Let me install the required auth packages." }))
 
   // Task post events
 
-  all.push({ time: 23500, event: { type: 'post_tool_use' as const, sessionId: SID_ARCH, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Implement OAuth backend routes' }, toolResponse: { result: 'OAuth routes implemented: /auth/google, /auth/github, /auth/callback, /auth/refresh' }, toolUseId: taskOAuthId, success: true, duration: 12000 } })
+  all.push({ time: 23500, event: { type: 'post_tool_use' as const, sessionId: SID_ARCH, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Implement OAuth backend routes' }, toolResponse: { result: 'OAuth routes implemented: /auth/google, /auth/github, /auth/callback, /auth/refresh' }, toolUseId: taskOAuthId, success: true, duration: 12000 }, phase: { name: 'Integration', description: 'Reviewing and integrating sub-agent results' }, narration: { text: 'Sub-agents report back and the Architect integrates their work into the main codebase.', duration: 5000 } })
   all.push(...timedToolPair({ sessionId: SID_ARCH, tool: 'Read', toolInput: { file_path: 'src/routes/auth.ts' }, toolResponse: { content: '// OAuth routes...' }, preTime: 24000, postTime: 24600, assistantText: "OAuth sub-agent finished. Let me review what it created." }))
   all.push(...timedToolPair({ sessionId: SID_ARCH, tool: 'Edit', toolInput: { file_path: 'src/routes/index.ts', old_string: "router.use('/api', apiRoutes)", new_string: "router.use('/api', apiRoutes)\nrouter.use('/auth', authRoutes)" }, preTime: 25500, postTime: 25900, assistantText: "I'll wire the OAuth routes into the main router." }))
   all.push({ time: 27500, event: { type: 'post_tool_use' as const, sessionId: SID_ARCH, cwd: DEMO_CWD, tool: 'Task', toolInput: { description: 'Build login/signup UI components' }, toolResponse: { result: 'UI components built: LoginForm, SignupForm, OAuthButtons, AuthProvider' }, toolUseId: taskUIId, success: true, duration: 14500 } })
@@ -122,12 +124,12 @@ function createArchitectScenario(): DemoScenario {
 
   // Phase 4: Final build
 
-  all.push(...timedToolPair({ sessionId: SID_ARCH, tool: 'Bash', toolInput: { command: 'npm run build' }, toolResponse: { stdout: '✓ Compiled successfully in 4.2s' }, preTime: 32500, postTime: 35500, assistantText: "All sub-agents done. Let me verify the full build passes." }))
+  { const [pre, post] = timedToolPair({ sessionId: SID_ARCH, tool: 'Bash', toolInput: { command: 'npm run build' }, toolResponse: { stdout: '✓ Compiled successfully in 4.2s' }, preTime: 32500, postTime: 35500, assistantText: "All sub-agents done. Let me verify the full build passes." }); all.push({ ...pre, phase: { name: 'Verification', description: 'Building and verifying the complete system' } }, post) }
   all.push({ time: 37500, event: { type: 'stop', sessionId: SID_ARCH, cwd: DEMO_CWD, stopHookActive: false, response: "Auth system complete! OAuth 2.0 with Google & GitHub, JWT tokens, login/signup UI, and 15 passing tests. Sub-agents handled backend, UI, and tests in parallel." } })
 
   // SUB-AGENT 1: OAuth Backend
 
-  all.push({ time: 12000, event: { type: 'user_prompt_submit', sessionId: SID_OAUTH, cwd: DEMO_CWD + '/server', prompt: 'Implement OAuth 2.0 routes with Google/GitHub providers, token refresh, and PKCE flow' }, spawnBeam: { from: SID_ARCH, to: SID_OAUTH } })
+  all.push({ time: 12000, event: { type: 'user_prompt_submit', sessionId: SID_OAUTH, cwd: DEMO_CWD + '/server', prompt: 'Implement OAuth 2.0 routes with Google/GitHub providers, token refresh, and PKCE flow' }, spawnBeam: { from: SID_ARCH, to: SID_OAUTH }, narration: { text: 'Each sub-agent works independently in its own zone with its own set of tools.', duration: 5000 } })
   all.push(...timedToolPair({ sessionId: SID_OAUTH, tool: 'Glob', toolInput: { pattern: 'server/routes/**/*.ts' }, toolResponse: { matches: ['server/routes/index.ts', 'server/routes/api.ts'] }, preTime: 13500, postTime: 14000, assistantText: "Let me find the existing route files." }))
   all.push(...timedToolPair({ sessionId: SID_OAUTH, tool: 'Read', toolInput: { file_path: 'server/routes/index.ts' }, toolResponse: { content: '// Existing routes...' }, preTime: 15000, postTime: 15700, assistantText: "Checking the route structure before adding OAuth." }))
   all.push(...timedToolPair({ sessionId: SID_OAUTH, tool: 'WebFetch', toolInput: { url: 'https://developers.google.com/identity/protocols/oauth2', prompt: 'OAuth PKCE flow steps' }, toolResponse: { content: 'Authorization code flow with PKCE...' }, preTime: 16800, postTime: 17800, assistantText: "Checking Google's OAuth docs for the PKCE flow." }))
@@ -302,5 +304,26 @@ export function createAgentSwarmBundle(): DemoScenarioBundle {
     managedSessions: createManagedSessions(),
     sessionIds: SESSION_IDS,
     managedIds: MANAGED_IDS,
+    education: {
+      intro: {
+        title: 'Agent Swarm',
+        description: 'Three orchestrators (Architect, Backend Lead, DevOps) each plan their area, then spawn specialized sub-agents to work in parallel. Watch how work flows from planning to delegation to parallel execution.',
+        watchFor: [
+          'Spawn beams connecting orchestrators to their sub-agents',
+          'Sub-agents working independently at different stations',
+          'Orchestrators continuing their own work while sub-agents build',
+          'Sub-agent zones disappearing as tasks complete',
+        ],
+        agentCount: { orchestrators: 3, subagents: 7 },
+      },
+      summary: {
+        achievements: [
+          'Auth system with OAuth, JWT, and 15 tests',
+          'API v2 with schema migration and Zod validation',
+          'CI/CD pipeline with GitHub Actions and K8s deployment',
+        ],
+        parallelTimeSaved: '~60s saved vs sequential execution',
+      },
+    },
   }
 }

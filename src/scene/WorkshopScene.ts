@@ -123,6 +123,7 @@ export class WorkshopScene {
   // Camera modes
   public cameraMode: CameraMode = 'focused'
   public focusedZoneId: string | null = null
+  private _lastCameraFollowTime = 0
   private onCameraModeChange: ((mode: CameraMode) => void) | null = null
   private onZoneElevationChange: ((sessionId: string, elevation: number) => void) | null = null
 
@@ -1881,8 +1882,11 @@ export class WorkshopScene {
     // Spawn particles
     this.emitParticles(zone)
 
-    // In follow-active mode, animate camera to active zone
+    // In follow-active mode, animate camera to active zone (with 2s dwell time to prevent ping-pong)
     if (this.cameraMode === 'follow-active' && this.focusedZoneId !== sessionId) {
+      const now = Date.now()
+      if (now - this._lastCameraFollowTime < 2000) return
+      this._lastCameraFollowTime = now
       this.focusedZoneId = sessionId
       const target = zone.position.clone()
       const cameraPos = target.clone().add(new THREE.Vector3(8, 6, 8))
