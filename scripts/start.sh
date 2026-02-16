@@ -1,5 +1,5 @@
 #!/bin/bash
-# Vibecraft Startup Script
+# Vibecraft2 Startup Script
 # Starts both the Vite dev server and WebSocket server
 
 set -e
@@ -18,7 +18,7 @@ fi
 # Create data directory if needed
 mkdir -p "$PLUGIN_DIR/data"
 
-echo "Starting Vibecraft..."
+echo "Starting Vibecraft2..."
 echo "  Frontend: http://localhost:4002"
 echo "  WebSocket: ws://localhost:4003"
 echo ""

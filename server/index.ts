@@ -1,5 +1,5 @@
 /**
- * Vibecraft WebSocket Server
+ * Vibecraft2 WebSocket Server
  *
  * This server:
  * 1. Watches the events JSONL file for changes
@@ -81,14 +81,14 @@ function expandHome(path: string): string {
   return path
 }
 
-const PORT = parseInt(process.env.VIBECRAFT_PORT ?? String(DEFAULTS.SERVER_PORT), 10)
-const EVENTS_FILE = resolve(expandHome(process.env.VIBECRAFT_EVENTS_FILE ?? DEFAULTS.EVENTS_FILE))
-const PENDING_PROMPT_FILE = resolve(expandHome(process.env.VIBECRAFT_PROMPT_FILE ?? '~/.vibecraft/data/pending-prompt.txt'))
-const MAX_EVENTS = parseInt(process.env.VIBECRAFT_MAX_EVENTS ?? String(DEFAULTS.MAX_EVENTS), 10)
-const DEBUG = process.env.VIBECRAFT_DEBUG === 'true'
-const TMUX_SESSION = process.env.VIBECRAFT_TMUX_SESSION ?? DEFAULTS.TMUX_SESSION
-const SESSIONS_FILE = resolve(expandHome(process.env.VIBECRAFT_SESSIONS_FILE ?? DEFAULTS.SESSIONS_FILE))
-const TILES_FILE = resolve(expandHome(process.env.VIBECRAFT_TILES_FILE ?? '~/.vibecraft/data/tiles.json'))
+const PORT = parseInt(process.env.VIBECRAFT2_PORT ?? String(DEFAULTS.SERVER_PORT), 10)
+const EVENTS_FILE = resolve(expandHome(process.env.VIBECRAFT2_EVENTS_FILE ?? DEFAULTS.EVENTS_FILE))
+const PENDING_PROMPT_FILE = resolve(expandHome(process.env.VIBECRAFT2_PROMPT_FILE ?? '~/.vibecraft2/data/pending-prompt.txt'))
+const MAX_EVENTS = parseInt(process.env.VIBECRAFT2_MAX_EVENTS ?? String(DEFAULTS.MAX_EVENTS), 10)
+const DEBUG = process.env.VIBECRAFT2_DEBUG === 'true'
+const TMUX_SESSION = process.env.VIBECRAFT2_TMUX_SESSION ?? DEFAULTS.TMUX_SESSION
+const SESSIONS_FILE = resolve(expandHome(process.env.VIBECRAFT2_SESSIONS_FILE ?? DEFAULTS.SESSIONS_FILE))
+const TILES_FILE = resolve(expandHome(process.env.VIBECRAFT2_TILES_FILE ?? '~/.vibecraft2/data/tiles.json'))
 
 /** Time before a "working" session auto-transitions to idle (failsafe for missed events) */
 const WORKING_TIMEOUT_MS = 120_000 // 2 minutes
@@ -135,7 +135,7 @@ function isOriginAllowed(origin: string | undefined): boolean {
     }
 
     // Production: exact hostname match with HTTPS required
-    if (url.hostname === 'vibecraft.sh' && url.protocol === 'https:') {
+    if (url.hostname === 'vibecraft2.sh' && url.protocol === 'https:') {
       return true
     }
 
@@ -229,7 +229,7 @@ async function sendToTmuxSafe(tmuxSession: string, text: string): Promise<void> 
   validateTmuxSession(tmuxSession)
 
   // Create temp file with cryptographically secure random name
-  const tempFile = `/tmp/vibecraft-prompt-${Date.now()}-${randomBytes(16).toString('hex')}.txt`
+  const tempFile = `/tmp/vibecraft2-prompt-${Date.now()}-${randomBytes(16).toString('hex')}.txt`
   writeFileSync(tempFile, text)
 
   try {
@@ -768,7 +768,7 @@ function createSession(options: CreateSessionRequest = {}): Promise<ManagedSessi
     const id = randomUUID()
     sessionCounter++
     const name = options.name || `Claude ${sessionCounter}`
-    const tmuxSession = `vibecraft-${shortId()}`
+    const tmuxSession = `vibecraft2-${shortId()}`
 
     // Validate cwd to prevent command injection
     let cwd: string
@@ -2297,7 +2297,7 @@ function serveStaticFile(req: IncomingMessage, res: ServerResponse): void {
 // ============================================================================
 
 function main() {
-  log('Starting Vibecraft server...')
+  log('Starting Vibecraft2 server...')
 
   // Load Deepgram API key for voice transcription
   deepgramApiKey = loadDeepgramKey()
@@ -2412,7 +2412,7 @@ function main() {
   httpServer.listen(PORT, () => {
     log(`Server running on port ${PORT}`)
     log(``)
-    log(`Open https://vibecraft.sh to view your workshop`)
+    log(`Open https://vibecraft2.sh to view your workshop`)
     log(``)
     log(`Local API endpoints:`)
     log(`  WebSocket: ws://localhost:${PORT}`)

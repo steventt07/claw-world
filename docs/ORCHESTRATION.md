@@ -1,10 +1,10 @@
-# Vibecraft Orchestration
+# Vibecraft2 Orchestration
 
 Orchestration lets you run multiple Claude Code instances and direct work to each one from a single web UI.
 
 ## Quick Start
 
-1. Start vibecraft server: `npm run server`
+1. Start vibecraft2 server: `npm run server`
 2. Open the web UI
 3. Click **"+ New"** in the Sessions panel to spawn a Claude
 4. Click on a session to select it as the prompt target
@@ -14,7 +14,7 @@ Orchestration lets you run multiple Claude Code instances and direct work to eac
 
 ### Managed Sessions
 
-A **managed session** is a Claude Code instance that vibecraft spawned and controls:
+A **managed session** is a Claude Code instance that vibecraft2 spawned and controls:
 
 - Has a user-friendly name ("Frontend", "Tests", etc.)
 - Tracked status: `idle`, `working`, `offline`
@@ -23,20 +23,20 @@ A **managed session** is a Claude Code instance that vibecraft spawned and contr
 
 ### Legacy Mode
 
-If you're running Claude Code in a tmux session called `claude` (the default), vibecraft can observe and prompt it, but it won't appear in the managed sessions list. This is "legacy mode" - it works but isn't part of orchestration.
+If you're running Claude Code in a tmux session called `claude` (the default), vibecraft2 can observe and prompt it, but it won't appear in the managed sessions list. This is "legacy mode" - it works but isn't part of orchestration.
 
 ## Architecture
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│                      Vibecraft Server                          │
+│                      Vibecraft2 Server                          │
 │                                                              │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
 │  │  Session 1  │  │  Session 2  │  │  Session 3  │  ...     │
 │  │ "Frontend"  │  │   "Tests"   │  │  "Refactor" │          │
 │  │             │  │             │  │             │          │
 │  │ tmux:       │  │ tmux:       │  │ tmux:       │          │
-│  │ vibecraft-   │  │ vibecraft-   │  │ vibecraft-   │          │
+│  │ vibecraft2-   │  │ vibecraft2-   │  │ vibecraft2-   │          │
 │  │ a1b2c3d4    │  │ e5f6g7h8    │  │ i9j0k1l2    │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
 │                                                              │
@@ -77,7 +77,7 @@ GET /sessions
     {
       "id": "uuid",
       "name": "Frontend",
-      "tmuxSession": "vibecraft-a1b2c3d4",
+      "tmuxSession": "vibecraft2-a1b2c3d4",
       "status": "idle",
       "createdAt": 1234567890,
       "lastActivity": 1234567890,
@@ -164,7 +164,7 @@ The server broadcasts session updates via WebSocket:
 
 ## Hooks Integration
 
-For managed sessions to report events back to vibecraft, Claude Code hooks must be configured globally. The hooks send events to the vibecraft server, which then:
+For managed sessions to report events back to vibecraft2, Claude Code hooks must be configured globally. The hooks send events to the vibecraft2 server, which then:
 
 1. Updates the session's `status` and `currentTool`
 2. Broadcasts the update to all connected UI clients

@@ -1,18 +1,18 @@
-# Vibecraft
+# Vibecraft2
 
-![Vibecraft Screenshot](public/og-image.png)
+![Vibecraft2 Screenshot](public/og-image.png)
 
 Manage Claude Code in style!
 
-**[Try it instantly at vibecraft.sh](https://vibecraft.sh)** — still connects to your local Claude Code instances!
+**[Try it instantly at vibecraft2.sh](https://vibecraft2.sh)** — still connects to your local Claude Code instances!
 
 **New:**
 - **Spatial Audio** — Claude behind you? Claude on your left? No claublem!
 - **Animations** — What's Claude up to? Watch him! ◕ ‿ ◕
 
-Vibecraft uses your own local Claude Code instances — no files or prompts are shared.
+Vibecraft2 uses your own local Claude Code instances — no files or prompts are shared.
 
-![Three.js](https://img.shields.io/badge/Three.js-black?logo=threedotjs) ![TypeScript](https://img.shields.io/badge/TypeScript-blue?logo=typescript&logoColor=white) ![npm](https://img.shields.io/npm/v/vibecraft)
+![Three.js](https://img.shields.io/badge/Three.js-black?logo=threedotjs) ![TypeScript](https://img.shields.io/badge/TypeScript-blue?logo=typescript&logoColor=white) ![npm](https://img.shields.io/npm/v/vibecraft2)
 
 ## Requirements
 
@@ -29,22 +29,22 @@ brew install jq tmux       # macOS
 # sudo apt install jq tmux  # Ubuntu/Debian
 
 # 2. Configure hooks (one time)
-npx vibecraft setup
+npx vibecraft2 setup
 
 # 3. Start server
-npx vibecraft
+npx vibecraft2
 ```
 
 Open http://localhost:4003 and use Claude Code normally. You'll see Claude move around the workshop as it uses tools.
 
 **From source:**
 ```bash
-git clone https://github.com/nearcyan/vibecraft
-cd vibecraft && npm install && npm run dev
+git clone https://github.com/nearcyan/vibecraft2
+cd vibecraft2 && npm install && npm run dev
 # Opens on http://localhost:4002
 ```
 
-**To uninstall:** `npx vibecraft uninstall` (removes hooks, keeps your data)
+**To uninstall:** `npx vibecraft2 uninstall` (removes hooks, keeps your data)
 
 ## Browser Control (Optional)
 
@@ -120,7 +120,7 @@ See [docs/ORCHESTRATION.md](docs/ORCHESTRATION.md) for the full API and architec
 ## CLI Options
 
 ```bash
-vibecraft [options]
+vibecraft2 [options]
 
 Options:
   --port, -p <port>    WebSocket server port (default: 4003)
@@ -131,7 +131,7 @@ Options:
 See [docs/SETUP.md](docs/SETUP.md) for detailed setup guide.
 See [CLAUDE.md](CLAUDE.md) for technical documentation.
 
-Website: https://vibecraft.sh
+Website: https://vibecraft2.sh
 
 ## License
 

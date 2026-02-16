@@ -1,4 +1,4 @@
-# Vibecraft Design Principles
+# Vibecraft2 Design Principles
 
 Guidelines for creating a fluid, interactive experience.
 

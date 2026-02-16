@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Vibecraft macOS Diagnostic Script
-# Run this to identify why Vibecraft isn't working on macOS
+# Vibecraft2 macOS Diagnostic Script
+# Run this to identify why Vibecraft2 isn't working on macOS
 #
 
 set -e
@@ -44,7 +44,7 @@ section() {
 
 echo ""
 echo "╔════════════════════════════════════════════════════════════╗"
-echo "║         VIBECRAFT macOS DIAGNOSTIC SCRIPT                  ║"
+echo "║         VIBECRAFT2 macOS DIAGNOSTIC SCRIPT                  ║"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
 
@@ -263,47 +263,47 @@ if [ -f "$CLAUDE_SETTINGS" ]; then
 
   # Check for hooks
   echo ""
-  echo "Checking for Vibecraft hooks in settings..."
-  if grep -q "vibecraft" "$CLAUDE_SETTINGS" 2>/dev/null; then
-    ok "Vibecraft hooks found in settings"
+  echo "Checking for Vibecraft2 hooks in settings..."
+  if grep -q "vibecraft2" "$CLAUDE_SETTINGS" 2>/dev/null; then
+    ok "Vibecraft2 hooks found in settings"
     echo ""
     info "Hook configuration:"
-    grep -A5 -B2 "vibecraft" "$CLAUDE_SETTINGS" | head -30
+    grep -A5 -B2 "vibecraft2" "$CLAUDE_SETTINGS" | head -30
   else
-    warn "No Vibecraft hooks found in settings"
-    echo "  Run 'vibecraft setup' to configure hooks"
+    warn "No Vibecraft2 hooks found in settings"
+    echo "  Run 'vibecraft2 setup' to configure hooks"
   fi
 else
   warn "Claude settings file not found: $CLAUDE_SETTINGS"
 fi
 
 # ==============================================================================
-section "6. VIBECRAFT DATA DIRECTORY"
+section "6. VIBECRAFT2 DATA DIRECTORY"
 # ==============================================================================
 
-VIBECRAFT_DATA="$HOME/.vibecraft/data"
+VIBECRAFT2_DATA="$HOME/.vibecraft2/data"
 
 echo ""
-echo "Checking Vibecraft data directory..."
-if [ -d "$VIBECRAFT_DATA" ]; then
-  ok "Data directory exists: $VIBECRAFT_DATA"
+echo "Checking Vibecraft2 data directory..."
+if [ -d "$VIBECRAFT2_DATA" ]; then
+  ok "Data directory exists: $VIBECRAFT2_DATA"
 
   echo ""
   info "Directory contents:"
-  ls -la "$VIBECRAFT_DATA" 2>/dev/null | sed 's/^/  /'
+  ls -la "$VIBECRAFT2_DATA" 2>/dev/null | sed 's/^/  /'
 
   echo ""
   info "Directory permissions:"
   # macOS uses different stat flags
   if [[ "$OSTYPE" == "darwin"* ]]; then
-    stat -f "  Mode: %Sp  Owner: %Su  Group: %Sg" "$VIBECRAFT_DATA" 2>/dev/null || ls -ld "$VIBECRAFT_DATA"
+    stat -f "  Mode: %Sp  Owner: %Su  Group: %Sg" "$VIBECRAFT2_DATA" 2>/dev/null || ls -ld "$VIBECRAFT2_DATA"
   else
-    stat -c "  Mode: %A  Owner: %U  Group: %G" "$VIBECRAFT_DATA" 2>/dev/null || ls -ld "$VIBECRAFT_DATA"
+    stat -c "  Mode: %A  Owner: %U  Group: %G" "$VIBECRAFT2_DATA" 2>/dev/null || ls -ld "$VIBECRAFT2_DATA"
   fi
 
   # Check events.jsonl
   echo ""
-  EVENTS_FILE="$VIBECRAFT_DATA/events.jsonl"
+  EVENTS_FILE="$VIBECRAFT2_DATA/events.jsonl"
   if [ -f "$EVENTS_FILE" ]; then
     EVENT_COUNT=$(wc -l < "$EVENTS_FILE" | tr -d ' ')
     EVENT_SIZE=$(ls -lh "$EVENTS_FILE" | awk '{print $5}')
@@ -339,7 +339,7 @@ if [ -d "$VIBECRAFT_DATA" ]; then
 
   # Check sessions.json
   echo ""
-  SESSIONS_FILE="$VIBECRAFT_DATA/sessions.json"
+  SESSIONS_FILE="$VIBECRAFT2_DATA/sessions.json"
   if [ -f "$SESSIONS_FILE" ]; then
     ok "sessions.json exists"
     info "Contents:"
@@ -349,13 +349,13 @@ if [ -d "$VIBECRAFT_DATA" ]; then
   fi
 
 else
-  warn "Data directory not found: $VIBECRAFT_DATA"
+  warn "Data directory not found: $VIBECRAFT2_DATA"
   echo "  Will be created when hook first runs"
 
   # Check parent directory
-  if [ -d "$HOME/.vibecraft" ]; then
-    info "Parent .vibecraft directory exists"
-    ls -la "$HOME/.vibecraft" | sed 's/^/  /'
+  if [ -d "$HOME/.vibecraft2" ]; then
+    info "Parent .vibecraft2 directory exists"
+    ls -la "$HOME/.vibecraft2" | sed 's/^/  /'
   fi
 fi
 
@@ -368,14 +368,14 @@ echo "Looking for hook script..."
 
 # Common locations
 HOOK_LOCATIONS=(
-  "$HOME/.vibecraft/hooks/vibecraft-hook.sh"
-  "/usr/local/share/vibecraft/hooks/vibecraft-hook.sh"
-  "/opt/homebrew/share/vibecraft/hooks/vibecraft-hook.sh"
+  "$HOME/.vibecraft2/hooks/vibecraft2-hook.sh"
+  "/usr/local/share/vibecraft2/hooks/vibecraft2-hook.sh"
+  "/opt/homebrew/share/vibecraft2/hooks/vibecraft2-hook.sh"
 )
 
 # Also check from Claude settings
 if [ -f "$CLAUDE_SETTINGS" ]; then
-  SETTINGS_HOOK=$(grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*vibecraft[^"]*"' "$CLAUDE_SETTINGS" 2>/dev/null | head -1 | sed 's/.*"\([^"]*\)"/\1/')
+  SETTINGS_HOOK=$(grep -o '"command"[[:space:]]*:[[:space:]]*"[^"]*vibecraft2[^"]*"' "$CLAUDE_SETTINGS" 2>/dev/null | head -1 | sed 's/.*"\([^"]*\)"/\1/')
   if [ -n "$SETTINGS_HOOK" ]; then
     HOOK_LOCATIONS+=("$SETTINGS_HOOK")
   fi
@@ -393,7 +393,7 @@ done
 if [ -z "$HOOK_FOUND" ]; then
   # Try to find it anywhere
   echo "  Searching for hook script..."
-  FOUND_HOOKS=$(find /usr /opt "$HOME" -name "vibecraft-hook.sh" 2>/dev/null | head -5)
+  FOUND_HOOKS=$(find /usr /opt "$HOME" -name "vibecraft2-hook.sh" 2>/dev/null | head -5)
   if [ -n "$FOUND_HOOKS" ]; then
     warn "Hook script found in unexpected location(s):"
     echo "$FOUND_HOOKS" | sed 's/^/    /'
@@ -425,7 +425,7 @@ if [ -n "$HOOK_FOUND" ]; then
   echo ""
 
   # Ensure data dir exists for test
-  mkdir -p "$VIBECRAFT_DATA"
+  mkdir -p "$VIBECRAFT2_DATA"
 
   # Run the hook (use gtimeout on macOS if available, otherwise skip timeout)
   if command -v gtimeout &> /dev/null; then
@@ -449,8 +449,8 @@ if [ -n "$HOOK_FOUND" ]; then
   fi
 
   # Check if event was written
-  if [ -f "$VIBECRAFT_DATA/events.jsonl" ]; then
-    LAST_EVENT=$(tail -1 "$VIBECRAFT_DATA/events.jsonl")
+  if [ -f "$VIBECRAFT2_DATA/events.jsonl" ]; then
+    LAST_EVENT=$(tail -1 "$VIBECRAFT2_DATA/events.jsonl")
     if echo "$LAST_EVENT" | grep -q "test-diag"; then
       ok "Test event was written to events.jsonl"
       info "Event: $(echo "$LAST_EVENT" | cut -c1-100)..."
@@ -465,9 +465,9 @@ section "8. SERVER CONNECTIVITY"
 # ==============================================================================
 
 echo ""
-echo "Checking if Vibecraft server is running..."
+echo "Checking if Vibecraft2 server is running..."
 
-SERVER_PORT="${VIBECRAFT_PORT:-4003}"
+SERVER_PORT="${VIBECRAFT2_PORT:-4003}"
 
 # Check health endpoint
 HEALTH_RESPONSE=$(curl -s -m 5 "http://localhost:$SERVER_PORT/health" 2>&1)
@@ -532,11 +532,11 @@ section "10. PROCESS CHECK"
 # ==============================================================================
 
 echo ""
-echo "Looking for Vibecraft-related processes..."
+echo "Looking for Vibecraft2-related processes..."
 
 echo ""
 info "Node processes:"
-ps aux | grep -E "[n]ode.*vibecraft|[t]sx.*vibecraft" | sed 's/^/  /' || echo "  (none found)"
+ps aux | grep -E "[n]ode.*vibecraft2|[t]sx.*vibecraft2" | sed 's/^/  /' || echo "  (none found)"
 
 echo ""
 info "tmux processes:"
@@ -551,9 +551,9 @@ section "11. ENVIRONMENT VARIABLES"
 # ==============================================================================
 
 echo ""
-info "Vibecraft-related environment variables:"
+info "Vibecraft2-related environment variables:"
 
-for var in VIBECRAFT_PORT VIBECRAFT_EVENTS_FILE VIBECRAFT_SESSIONS_FILE VIBECRAFT_DATA_DIR VIBECRAFT_DEBUG VIBECRAFT_TMUX_SESSION VIBECRAFT_ENABLE_WS_NOTIFY; do
+for var in VIBECRAFT2_PORT VIBECRAFT2_EVENTS_FILE VIBECRAFT2_SESSIONS_FILE VIBECRAFT2_DATA_DIR VIBECRAFT2_DEBUG VIBECRAFT2_TMUX_SESSION VIBECRAFT2_ENABLE_WS_NOTIFY; do
   val="${!var}"
   if [ -n "$val" ]; then
     echo "  $var=$val"
@@ -587,9 +587,9 @@ check_perms() {
   fi
 }
 
-check_perms "$HOME/.vibecraft" ".vibecraft directory"
-check_perms "$HOME/.vibecraft/data" "data directory"
-check_perms "$HOME/.vibecraft/data/events.jsonl" "events.jsonl"
+check_perms "$HOME/.vibecraft2" ".vibecraft2 directory"
+check_perms "$HOME/.vibecraft2/data" "data directory"
+check_perms "$HOME/.vibecraft2/data/events.jsonl" "events.jsonl"
 check_perms "$HOME/.claude" ".claude directory"
 check_perms "$HOME/.claude/settings.json" "Claude settings"
 
@@ -600,7 +600,7 @@ section "13. WRITE TEST"
 echo ""
 echo "Testing write capabilities..."
 
-TEST_DIR="$HOME/.vibecraft/data"
+TEST_DIR="$HOME/.vibecraft2/data"
 TEST_FILE="$TEST_DIR/.diag-test-$$"
 
 mkdir -p "$TEST_DIR" 2>/dev/null
@@ -613,18 +613,18 @@ else
 fi
 
 # ==============================================================================
-section "14. NPX/NPM VIBECRAFT CHECK"
+section "14. NPX/NPM VIBECRAFT2 CHECK"
 # ==============================================================================
 
 echo ""
-echo "Checking npx vibecraft installation..."
+echo "Checking npx vibecraft2 installation..."
 
-# Check if vibecraft is installed globally
-if command -v vibecraft &> /dev/null; then
-  VIBECRAFT_PATH=$(which vibecraft)
-  ok "vibecraft command found: $VIBECRAFT_PATH"
+# Check if vibecraft2 is installed globally
+if command -v vibecraft2 &> /dev/null; then
+  VIBECRAFT2_PATH=$(which vibecraft2)
+  ok "vibecraft2 command found: $VIBECRAFT2_PATH"
 else
-  info "vibecraft not installed globally"
+  info "vibecraft2 not installed globally"
 fi
 
 # Check npm cache for npx
@@ -632,10 +632,10 @@ echo ""
 info "npm cache location:"
 npm config get cache 2>/dev/null | sed 's/^/  /'
 
-# Check if there's a local package.json with vibecraft
+# Check if there's a local package.json with vibecraft2
 if [ -f "package.json" ]; then
-  if grep -q "vibecraft" package.json 2>/dev/null; then
-    ok "vibecraft found in local package.json"
+  if grep -q "vibecraft2" package.json 2>/dev/null; then
+    ok "vibecraft2 found in local package.json"
   fi
 fi
 
@@ -694,8 +694,8 @@ if [ $ERRORS -gt 0 ]; then
   echo "Common fixes:"
   echo "  • Install jq:    brew install jq"
   echo "  • Install tmux:  brew install tmux"
-  echo "  • Setup hooks:   npx vibecraft setup"
-  echo "  • Start server:  npx vibecraft (or npm run dev)"
+  echo "  • Setup hooks:   npx vibecraft2 setup"
+  echo "  • Start server:  npx vibecraft2 (or npm run dev)"
 elif [ $WARNINGS -gt 0 ]; then
   echo -e "${YELLOW}⚡ There are some warnings to review.${NC}"
 else

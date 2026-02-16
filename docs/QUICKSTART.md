@@ -1,4 +1,4 @@
-# Vibecraft Quick Start
+# Vibecraft2 Quick Start
 
 ## TL;DR
 
@@ -7,10 +7,10 @@
 brew install jq tmux
 
 # Configure hooks (once)
-npx vibecraft setup
+npx vibecraft2 setup
 
 # Run
-npx vibecraft
+npx vibecraft2
 ```
 
 Open http://localhost:4003 and use Claude normally.
@@ -22,7 +22,7 @@ Open http://localhost:4003 and use Claude normally.
 | Problem | Fix |
 |---------|-----|
 | "jq not found" | `brew install jq` or `apt install jq` |
-| "Agent Not Connected" | Is `npx vibecraft` running? Did you run `setup`? |
+| "Agent Not Connected" | Is `npx vibecraft2` running? Did you run `setup`? |
 | No events | Restart Claude Code after setup |
 | Wrong port | Default is 4003, check your URL |
 

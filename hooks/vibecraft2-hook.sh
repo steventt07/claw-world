@@ -1,5 +1,5 @@
 #!/bin/bash
-# Vibecraft Hook - Captures Claude Code events for 3D visualization
+# Vibecraft2 Hook - Captures Claude Code events for 3D visualization
 #
 # This script is called by Claude Code hooks and:
 # 1. Reads the hook input from stdin
@@ -7,8 +7,8 @@
 # 3. Appends to the events JSONL file
 # 4. Optionally notifies the WebSocket server
 #
-# Installed to: ~/.vibecraft/hooks/vibecraft-hook.sh
-# Run `npx vibecraft setup` to install/update this hook.
+# Installed to: ~/.vibecraft2/hooks/vibecraft2-hook.sh
+# Run `npx vibecraft2 setup` to install/update this hook.
 
 set -e
 
@@ -57,7 +57,7 @@ find_tool() {
 
 # Find required tools
 JQ=$(find_tool "jq") || {
-  echo "vibecraft-hook: ERROR - jq not found. Install it:" >&2
+  echo "vibecraft2-hook: ERROR - jq not found. Install it:" >&2
   echo "  macOS: brew install jq" >&2
   echo "  Linux: apt install jq (or yum install jq)" >&2
   exit 1
@@ -72,12 +72,12 @@ CURL=$(find_tool "curl") || {
 # Configuration
 # =============================================================================
 
-# IMPORTANT: Use ~/.vibecraft/ as the data directory to ensure consistent
-# location regardless of how vibecraft was installed (npx, global npm, local dev).
-VIBECRAFT_DATA_DIR="${VIBECRAFT_DATA_DIR:-$HOME/.vibecraft/data}"
-EVENTS_FILE="${VIBECRAFT_EVENTS_FILE:-$VIBECRAFT_DATA_DIR/events.jsonl}"
-WS_NOTIFY_URL="${VIBECRAFT_WS_NOTIFY:-http://localhost:4003/event}"
-ENABLE_WS_NOTIFY="${VIBECRAFT_ENABLE_WS_NOTIFY:-true}"
+# IMPORTANT: Use ~/.vibecraft2/ as the data directory to ensure consistent
+# location regardless of how vibecraft2 was installed (npx, global npm, local dev).
+VIBECRAFT2_DATA_DIR="${VIBECRAFT2_DATA_DIR:-$HOME/.vibecraft2/data}"
+EVENTS_FILE="${VIBECRAFT2_EVENTS_FILE:-$VIBECRAFT2_DATA_DIR/events.jsonl}"
+WS_NOTIFY_URL="${VIBECRAFT2_WS_NOTIFY:-http://localhost:4003/event}"
+ENABLE_WS_NOTIFY="${VIBECRAFT2_ENABLE_WS_NOTIFY:-true}"
 
 # Ensure data directory exists
 mkdir -p "$(dirname "$EVENTS_FILE")"

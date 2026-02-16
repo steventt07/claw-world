@@ -1,5 +1,5 @@
 /**
- * Vibecraft - Main Entry Point
+ * Vibecraft2 - Main Entry Point
  *
  * Visualize Claude Code as an interactive 3D workshop
  * Supports multiple Claude instances in separate zones
@@ -73,7 +73,7 @@ import {
 // ============================================================================
 
 // Injected by Vite at build time from shared/defaults.ts
-declare const __VIBECRAFT_DEFAULT_PORT__: number
+declare const __VIBECRAFT2_DEFAULT_PORT__: number
 
 // Port configuration: URL param > localStorage > default from shared/defaults.ts
 function getAgentPort(): number {
@@ -81,10 +81,10 @@ function getAgentPort(): number {
   const urlPort = params.get('port')
   if (urlPort) return parseInt(urlPort, 10)
 
-  const storedPort = localStorage.getItem('vibecraft-agent-port')
+  const storedPort = localStorage.getItem('vibecraft2-agent-port')
   if (storedPort) return parseInt(storedPort, 10)
 
-  return __VIBECRAFT_DEFAULT_PORT__
+  return __VIBECRAFT2_DEFAULT_PORT__
 }
 
 const AGENT_PORT = getAgentPort()
@@ -336,9 +336,9 @@ function selectManagedSession(sessionId: string | null): void {
 
   // Persist selection to localStorage
   if (sessionId) {
-    localStorage.setItem('vibecraft-selected-session', sessionId)
+    localStorage.setItem('vibecraft2-selected-session', sessionId)
   } else {
-    localStorage.removeItem('vibecraft-selected-session')
+    localStorage.removeItem('vibecraft2-selected-session')
   }
 
   // Update feed filter to show only this session's events (or all if null)
@@ -953,8 +953,8 @@ function setupClickToPrompt(): void {
       if (!state.scene) return
       const hexes = state.scene.getPaintedHexes()
       const zoneElevations = state.scene.getZoneElevations()
-      localStorage.setItem('vibecraft-hexart', JSON.stringify(hexes))
-      localStorage.setItem('vibecraft-zone-elevations', JSON.stringify(zoneElevations))
+      localStorage.setItem('vibecraft2-hexart', JSON.stringify(hexes))
+      localStorage.setItem('vibecraft2-zone-elevations', JSON.stringify(zoneElevations))
       const elevCount = Object.keys(zoneElevations).length
       console.log(`Saved ${hexes.length} painted hexes and ${elevCount} zone elevations to localStorage`)
     }, 500)  // Debounce 500ms
@@ -2322,8 +2322,8 @@ function setupSettingsModal(): void {
   drawMode.onClear(() => {
     state.scene?.clearAllPaintedHexes()
     // Clear from localStorage too
-    localStorage.removeItem('vibecraft-hexart')
-    localStorage.removeItem('vibecraft-zone-elevations')
+    localStorage.removeItem('vibecraft2-hexart')
+    localStorage.removeItem('vibecraft2-zone-elevations')
     console.log('Cleared hex art and zone elevations from localStorage')
   })
 
@@ -2332,7 +2332,7 @@ function setupSettingsModal(): void {
   const portStatus = document.getElementById('settings-port-status')
 
   // Load saved volume from localStorage
-  const savedVolume = localStorage.getItem('vibecraft-volume')
+  const savedVolume = localStorage.getItem('vibecraft2-volume')
   if (savedVolume !== null) {
     const vol = parseInt(savedVolume, 10) / 100
     soundManager.setVolume(vol)
@@ -2341,7 +2341,7 @@ function setupSettingsModal(): void {
   }
 
   // Load saved grid size from localStorage
-  const savedGridSize = localStorage.getItem('vibecraft-grid-size')
+  const savedGridSize = localStorage.getItem('vibecraft2-grid-size')
   if (savedGridSize !== null) {
     const size = parseInt(savedGridSize, 10)
     state.scene?.setGridRange(size)
@@ -2350,7 +2350,7 @@ function setupSettingsModal(): void {
   }
 
   // Load saved spatial audio setting from localStorage
-  const savedSpatial = localStorage.getItem('vibecraft-spatial-audio')
+  const savedSpatial = localStorage.getItem('vibecraft2-spatial-audio')
   if (savedSpatial !== null) {
     const enabled = savedSpatial === 'true'
     soundManager.setSpatialEnabled(enabled)
@@ -2358,7 +2358,7 @@ function setupSettingsModal(): void {
   }
 
   // Load saved streaming mode setting from localStorage
-  const savedStreaming = localStorage.getItem('vibecraft-streaming-mode')
+  const savedStreaming = localStorage.getItem('vibecraft2-streaming-mode')
   if (savedStreaming !== null) {
     const enabled = savedStreaming === 'true'
     if (streamingCheckbox) streamingCheckbox.checked = enabled
@@ -2398,7 +2398,7 @@ function setupSettingsModal(): void {
     }
     // Sync streaming mode checkbox
     if (streamingCheckbox) {
-      streamingCheckbox.checked = localStorage.getItem('vibecraft-streaming-mode') === 'true'
+      streamingCheckbox.checked = localStorage.getItem('vibecraft2-streaming-mode') === 'true'
     }
     // Sync port input
     if (portInput) portInput.value = String(AGENT_PORT)
@@ -2423,7 +2423,7 @@ function setupSettingsModal(): void {
     const vol = parseInt(volumeSlider.value, 10)
     soundManager.setVolume(vol / 100)
     if (volumeValue) volumeValue.textContent = `${vol}%`
-    localStorage.setItem('vibecraft-volume', String(vol))
+    localStorage.setItem('vibecraft2-volume', String(vol))
     // Play tick with pitch based on slider position
     if (state.soundEnabled) {
       soundManager.playSliderTick(vol / 100)
@@ -2435,7 +2435,7 @@ function setupSettingsModal(): void {
     const size = parseInt(gridSizeSlider.value, 10)
     if (gridSizeValue) gridSizeValue.textContent = String(size)
     state.scene?.setGridRange(size)
-    localStorage.setItem('vibecraft-grid-size', String(size))
+    localStorage.setItem('vibecraft2-grid-size', String(size))
     // Play tick with pitch based on slider position (normalized 5-80 to 0-1)
     if (state.soundEnabled) {
       soundManager.playSliderTick((size - 5) / 75)
@@ -2446,13 +2446,13 @@ function setupSettingsModal(): void {
   spatialCheckbox?.addEventListener('change', () => {
     const enabled = spatialCheckbox.checked
     soundManager.setSpatialEnabled(enabled)
-    localStorage.setItem('vibecraft-spatial-audio', String(enabled))
+    localStorage.setItem('vibecraft2-spatial-audio', String(enabled))
   })
 
   // Streaming mode checkbox
   streamingCheckbox?.addEventListener('change', () => {
     const enabled = streamingCheckbox.checked
-    localStorage.setItem('vibecraft-streaming-mode', String(enabled))
+    localStorage.setItem('vibecraft2-streaming-mode', String(enabled))
     applyStreamingMode(enabled)
   })
 
@@ -2460,7 +2460,7 @@ function setupSettingsModal(): void {
   portInput?.addEventListener('change', () => {
     const newPort = parseInt(portInput.value, 10)
     if (newPort && newPort > 0 && newPort <= 65535 && newPort !== AGENT_PORT) {
-      localStorage.setItem('vibecraft-agent-port', String(newPort))
+      localStorage.setItem('vibecraft2-agent-port', String(newPort))
       if (confirm(`Port changed to ${newPort}. Reload page to connect to new port?`)) {
         window.location.reload()
       }
@@ -3063,7 +3063,7 @@ function init() {
   }, 100)
 
   // Load saved hex art from localStorage
-  const savedHexArt = localStorage.getItem('vibecraft-hexart')
+  const savedHexArt = localStorage.getItem('vibecraft2-hexart')
   if (savedHexArt) {
     try {
       const hexes = JSON.parse(savedHexArt)
@@ -3075,7 +3075,7 @@ function init() {
   }
 
   // Load saved zone elevations from localStorage
-  const savedZoneElevations = localStorage.getItem('vibecraft-zone-elevations')
+  const savedZoneElevations = localStorage.getItem('vibecraft2-zone-elevations')
   if (savedZoneElevations) {
     try {
       const elevations = JSON.parse(savedZoneElevations)
@@ -3337,7 +3337,7 @@ function init() {
     // Restore or auto-select session
     if (!state.selectedManagedSession && sessions.length > 0) {
       // Try to restore from localStorage
-      const savedSessionId = localStorage.getItem('vibecraft-selected-session')
+      const savedSessionId = localStorage.getItem('vibecraft2-selected-session')
       const savedSession = savedSessionId ? sessions.find(s => s.id === savedSessionId) : null
 
       if (savedSession) {
@@ -3493,9 +3493,9 @@ function init() {
   })
 
   // Setup voice input
-  // On vibecraft.sh: voice is always available via cloud proxy, set up immediately
+  // On vibecraft2.sh: voice is always available via cloud proxy, set up immediately
   // On localhost: needs client connected and voice enabled on server
-  const isHostedSite = window.location.hostname === 'vibecraft.sh'
+  const isHostedSite = window.location.hostname === 'vibecraft2.sh'
   const voiceControl = document.getElementById('voice-control')
 
   if (isHostedSite) {
@@ -3553,7 +3553,7 @@ function init() {
   // Check for updates (non-blocking)
   checkForUpdates()
 
-  console.log('Vibecraft initialized (multi-session enabled)')
+  console.log('Vibecraft2 initialized (multi-session enabled)')
 }
 
 // ============================================================================
@@ -3578,4 +3578,4 @@ window.addEventListener('load', init)
 window.addEventListener('beforeunload', cleanup)
 
 // Export for debugging
-;(window as unknown as { vibecraft: AppState }).vibecraft = state
+;(window as unknown as { vibecraft2: AppState }).vibecraft2 = state

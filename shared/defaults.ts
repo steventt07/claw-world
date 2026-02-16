@@ -1,5 +1,5 @@
 /**
- * Vibecraft - Central Configuration Defaults
+ * Vibecraft2 - Central Configuration Defaults
  *
  * Single source of truth for default values.
  * Environment variables override these defaults.
@@ -14,17 +14,17 @@ export const DEFAULTS = {
 
   /**
    * Events file path.
-   * Uses ~/.vibecraft/ to ensure consistent location regardless of
-   * how vibecraft was installed (npx, global npm, local dev).
+   * Uses ~/.vibecraft2/ to ensure consistent location regardless of
+   * how vibecraft2 was installed (npx, global npm, local dev).
    * The ~ is expanded by the server at runtime.
    */
-  EVENTS_FILE: '~/.vibecraft/data/events.jsonl',
+  EVENTS_FILE: '~/.vibecraft2/data/events.jsonl',
 
   /**
    * Sessions file path.
-   * Uses ~/.vibecraft/ for consistency across installations.
+   * Uses ~/.vibecraft2/ for consistency across installations.
    */
-  SESSIONS_FILE: '~/.vibecraft/data/sessions.json',
+  SESSIONS_FILE: '~/.vibecraft2/data/sessions.json',
 
   /** Max events to keep in memory */
   MAX_EVENTS: 1000,

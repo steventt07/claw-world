@@ -1,10 +1,10 @@
 # Sound System
 
-This document explains Vibecraft's audio architecture, including synthesized sounds and spatial audio positioning.
+This document explains Vibecraft2's audio architecture, including synthesized sounds and spatial audio positioning.
 
 ## Overview
 
-Vibecraft uses **Tone.js** for programmatic sound synthesis. No audio files are needed - all sounds are generated in real-time using Web Audio API.
+Vibecraft2 uses **Tone.js** for programmatic sound synthesis. No audio files are needed - all sounds are generated in real-time using Web Audio API.
 
 ```
 Event (tool use, stop, etc.)
@@ -189,7 +189,7 @@ setInterval(() => {
 ### Settings
 
 - **Toggle**: Settings modal checkbox "Spatial Audio"
-- **Storage**: `localStorage.getItem('vibecraft-spatial-audio')`
+- **Storage**: `localStorage.getItem('vibecraft2-spatial-audio')`
 - **Default**: Enabled
 - **When disabled**: All sounds play centered at full volume
 

@@ -1,10 +1,10 @@
-# Vibecraft Setup Guide
+# Vibecraft2 Setup Guide
 
-Complete installation and troubleshooting guide for Vibecraft.
+Complete installation and troubleshooting guide for Vibecraft2.
 
-## What is Vibecraft?
+## What is Vibecraft2?
 
-Vibecraft visualizes Claude Code's activity in real-time as a 3D workshop. When Claude uses tools (Read, Edit, Bash, etc.), a character moves to corresponding workstations.
+Vibecraft2 visualizes Claude Code's activity in real-time as a 3D workshop. When Claude uses tools (Read, Edit, Bash, etc.), a character moves to corresponding workstations.
 
 **Two parts:**
 1. **Hooks** - Capture events from Claude Code
@@ -12,7 +12,7 @@ Vibecraft visualizes Claude Code's activity in real-time as a 3D workshop. When 
 
 ```
 ┌─────────────────┐      hooks       ┌─────────────────┐
-│  Claude Code    │ ───────────────→ │  Vibecraft      │
+│  Claude Code    │ ───────────────→ │  Vibecraft2      │
 │  (your CLI)     │                  │  Server (:4003) │
 └─────────────────┘                  └────────┬────────┘
                                               │
@@ -43,7 +43,7 @@ pacman -S jq tmux
 ### Step 2: Configure hooks
 
 ```bash
-npx vibecraft setup
+npx vibecraft2 setup
 ```
 
 This automatically adds hooks to `~/.claude/settings.json`.
@@ -51,8 +51,8 @@ This automatically adds hooks to `~/.claude/settings.json`.
 ### Step 3: Start server and use Claude
 
 ```bash
-# Terminal 1: Start Vibecraft server
-npx vibecraft
+# Terminal 1: Start Vibecraft2 server
+npx vibecraft2
 
 # Terminal 2: Use Claude Code normally
 claude
@@ -86,12 +86,12 @@ tmux -V          # Should output version (optional)
 ### Option A: Automatic (Recommended)
 
 ```bash
-npx vibecraft setup
+npx vibecraft2 setup
 ```
 
 This:
-- Copies hook script to `~/.vibecraft/hooks/vibecraft-hook.sh`
-- Creates `~/.vibecraft/data/` directory
+- Copies hook script to `~/.vibecraft2/hooks/vibecraft2-hook.sh`
+- Creates `~/.vibecraft2/data/` directory
 - Configures all 8 hooks in `~/.claude/settings.json`
 - Backs up existing settings
 - Checks for jq/tmux
@@ -135,10 +135,10 @@ If you prefer to configure hooks manually, add to `~/.claude/settings.json`:
 
 Replace `HOOK_PATH` with the output of:
 ```bash
-npx vibecraft --hook-path
+npx vibecraft2 --hook-path
 ```
 
-**Note:** You must also copy the hook script to a stable location and ensure `~/.vibecraft/data/` exists.
+**Note:** You must also copy the hook script to a stable location and ensure `~/.vibecraft2/data/` exists.
 
 ---
 
@@ -151,10 +151,10 @@ If you see this overlay in the browser:
 │                                  │
 │     🔌 Agent Not Connected       │
 │                                  │
-│  Vibecraft needs a local agent   │
+│  Vibecraft2 needs a local agent   │
 │  running to receive events.      │
 │                                  │
-│       [ npx vibecraft ]          │
+│       [ npx vibecraft2 ]          │
 │                                  │
 └──────────────────────────────────┘
 ```
@@ -163,9 +163,9 @@ If you see this overlay in the browser:
 
 | Problem | Solution |
 |---------|----------|
-| Server not running | Run `npx vibecraft` in a terminal |
+| Server not running | Run `npx vibecraft2` in a terminal |
 | Wrong port | Check URL matches server port (default: 4003) |
-| Hooks not configured | Run `npx vibecraft setup` |
+| Hooks not configured | Run `npx vibecraft2 setup` |
 
 **Quick test:**
 ```bash
@@ -178,7 +178,7 @@ curl http://localhost:4003/health
 
 ## Sending Prompts from Browser
 
-To send prompts to Claude from the Vibecraft UI:
+To send prompts to Claude from the Vibecraft2 UI:
 
 ### Step 1: Run Claude in tmux
 
@@ -190,11 +190,11 @@ tmux new -s claude
 claude
 ```
 
-### Step 2: Use Vibecraft normally
+### Step 2: Use Vibecraft2 normally
 
 ```bash
 # In another terminal
-npx vibecraft
+npx vibecraft2
 ```
 
 ### Step 3: Send prompts
@@ -203,7 +203,7 @@ In the browser, type in the prompt field and click "Send" with "Send to tmux" ch
 
 **Note:** If you named your tmux session something other than `claude`:
 ```bash
-VIBECRAFT_TMUX_SESSION=myname npx vibecraft
+VIBECRAFT2_TMUX_SESSION=myname npx vibecraft2
 ```
 
 ---
@@ -226,7 +226,7 @@ pacman -S jq
 ### "Permission denied" on hook script
 
 ```bash
-chmod +x $(npx vibecraft --hook-path)
+chmod +x $(npx vibecraft2 --hook-path)
 ```
 
 ### Events not appearing
@@ -238,7 +238,7 @@ curl http://localhost:4003/health
 
 **2. Check hooks are configured:**
 ```bash
-cat ~/.claude/settings.json | grep vibecraft
+cat ~/.claude/settings.json | grep vibecraft2
 ```
 
 **3. Restart Claude Code** (hooks load at startup)
@@ -251,12 +251,12 @@ tmux list-sessions
 
 # Default session name is 'claude'
 # If different, set environment variable:
-VIBECRAFT_TMUX_SESSION=yourname npx vibecraft
+VIBECRAFT2_TMUX_SESSION=yourname npx vibecraft2
 ```
 
 ### Events appearing twice
 
-You likely have duplicate hooks configured. Check `~/.claude/settings.json` for duplicate vibecraft-hook entries and remove extras. Then run `npx vibecraft setup` to ensure correct configuration.
+You likely have duplicate hooks configured. Check `~/.claude/settings.json` for duplicate vibecraft2-hook entries and remove extras. Then run `npx vibecraft2 setup` to ensure correct configuration.
 
 ### Browser shows "Disconnected"
 
@@ -285,14 +285,14 @@ For speech-to-text prompts:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `VIBECRAFT_PORT` | `4003` | Server port |
-| `VIBECRAFT_TMUX_SESSION` | `claude` | tmux session for prompts |
-| `VIBECRAFT_DEBUG` | `false` | Verbose logging |
+| `VIBECRAFT2_PORT` | `4003` | Server port |
+| `VIBECRAFT2_TMUX_SESSION` | `claude` | tmux session for prompts |
+| `VIBECRAFT2_DEBUG` | `false` | Verbose logging |
 | `DEEPGRAM_API_KEY` | (none) | Deepgram API key for voice input |
 
 Example:
 ```bash
-VIBECRAFT_PORT=4005 VIBECRAFT_DEBUG=true npx vibecraft
+VIBECRAFT2_PORT=4005 VIBECRAFT2_DEBUG=true npx vibecraft2
 ```
 
 ---
@@ -303,8 +303,8 @@ For contributing or modifying:
 
 ```bash
 # Clone
-git clone https://github.com/nearcyan/vibecraft
-cd vibecraft
+git clone https://github.com/nearcyan/vibecraft2
+cd vibecraft2
 
 # Install dependencies
 npm install
@@ -316,28 +316,28 @@ npm run dev
 open http://localhost:4002
 ```
 
-**Note:** In dev mode, frontend and API run on different ports. In production (`npx vibecraft`), everything runs on port 4003.
+**Note:** In dev mode, frontend and API run on different ports. In production (`npx vibecraft2`), everything runs on port 4003.
 
 ---
 
 ## Uninstalling
 
-To remove Vibecraft hooks (keeps your event data):
+To remove Vibecraft2 hooks (keeps your event data):
 
 ```bash
-npx vibecraft uninstall
+npx vibecraft2 uninstall
 ```
 
 This:
-- Removes vibecraft hooks from `~/.claude/settings.json`
-- Removes the hook script from `~/.vibecraft/hooks/`
-- **Keeps** your data in `~/.vibecraft/data/`
+- Removes vibecraft2 hooks from `~/.claude/settings.json`
+- Removes the hook script from `~/.vibecraft2/hooks/`
+- **Keeps** your data in `~/.vibecraft2/data/`
 - Does NOT affect other hooks you may have configured
 
 To completely remove all data:
 
 ```bash
-rm -rf ~/.vibecraft
+rm -rf ~/.vibecraft2
 ```
 
 **Restart Claude Code after uninstalling for changes to take effect.**
@@ -346,6 +346,6 @@ rm -rf ~/.vibecraft
 
 ## Getting Help
 
-- **GitHub Issues:** https://github.com/nearcyan/vibecraft/issues
+- **GitHub Issues:** https://github.com/nearcyan/vibecraft2/issues
 - **Technical Docs:** See [CLAUDE.md](../CLAUDE.md)
 - **Orchestration:** See [ORCHESTRATION.md](./ORCHESTRATION.md)

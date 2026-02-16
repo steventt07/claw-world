@@ -18,10 +18,10 @@ import type { EventClient } from '../events/EventClient'
 import { keybindManager } from './KeybindConfig'
 
 /**
- * Check if we're running on the hosted vibecraft.sh site
+ * Check if we're running on the hosted vibecraft2.sh site
  */
 function isHostedSite(): boolean {
-  return window.location.hostname === 'vibecraft.sh'
+  return window.location.hostname === 'vibecraft2.sh'
 }
 
 /**
@@ -92,7 +92,7 @@ export function setupVoiceControl(deps: VoiceControlDeps): VoiceState | null {
   let error: string | null = null
   let deepgramReady = false
   let connectionTimeout: number | null = null
-  let cloudVoiceSocket: WebSocket | null = null  // Used on vibecraft.sh
+  let cloudVoiceSocket: WebSocket | null = null  // Used on vibecraft2.sh
 
   // State object that will be exposed
   const voiceState: VoiceState = {

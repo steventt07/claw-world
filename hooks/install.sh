@@ -1,15 +1,15 @@
 #!/bin/bash
-# Vibecraft Hooks Installer
+# Vibecraft2 Hooks Installer
 #
-# This script helps integrate Vibecraft hooks with your Claude Code settings.
+# This script helps integrate Vibecraft2 hooks with your Claude Code settings.
 # It generates the hook configuration that you can add to your settings.json.
 
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-HOOK_SCRIPT="$SCRIPT_DIR/vibecraft-hook.sh"
+HOOK_SCRIPT="$SCRIPT_DIR/vibecraft2-hook.sh"
 
-echo "Vibecraft Hooks Configuration Generator"
+echo "Vibecraft2 Hooks Configuration Generator"
 echo "======================================="
 echo ""
 echo "Hook script location: $HOOK_SCRIPT"
@@ -71,7 +71,7 @@ echo ""
 echo "If you already have hooks configured, merge the above with your existing config."
 echo ""
 echo "Environment variables you can set:"
-echo "  VIBECRAFT_DIR           - Base directory (default: ~/vibecraft)"
-echo "  VIBECRAFT_EVENTS_FILE   - Events file path (default: \$VIBECRAFT_DIR/data/events.jsonl)"
-echo "  VIBECRAFT_WS_NOTIFY     - WebSocket notify URL (default: http://localhost:4003/event)"
-echo "  VIBECRAFT_ENABLE_WS_NOTIFY - Enable WebSocket notifications (default: true)"
+echo "  VIBECRAFT2_DIR           - Base directory (default: ~/vibecraft2)"
+echo "  VIBECRAFT2_EVENTS_FILE   - Events file path (default: \$VIBECRAFT2_DIR/data/events.jsonl)"
+echo "  VIBECRAFT2_WS_NOTIFY     - WebSocket notify URL (default: http://localhost:4003/event)"
+echo "  VIBECRAFT2_ENABLE_WS_NOTIFY - Enable WebSocket notifications (default: true)"
