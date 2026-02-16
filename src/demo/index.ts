@@ -1,6 +1,6 @@
 export { startDemoMode, stopDemoMode, isDemoMode, isExplicitDemo, isReplayMode } from './DemoMode'
 export type { DemoModeConfig, DemoModeOptions } from './DemoMode'
 export type { DemoScenarioType } from './types'
-export { SCENARIO_META } from './scenarios'
+export { SCENARIO_META, createScenarioBundle } from './scenarios'
 export { fetchReplaySessions, createReplayBundle } from './replay'
 export type { ReplaySpeed } from './replay'
