@@ -17,7 +17,7 @@ export default defineConfig({
     __VIBECRAFT2_DEFAULT_PORT__: serverPort,
   },
   server: {
-    port: clientPort,
+    port: 8080,
     proxy: {
       '/ws': {
         target: `ws://localhost:${serverPort}`,
