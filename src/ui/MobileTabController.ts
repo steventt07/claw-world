@@ -16,6 +16,7 @@ export class MobileTabController {
   private touchStartX = 0
   private touchStartY = 0
   private enabled = false
+  private touchStartedOnCanvas = false
 
   /** Current phase info for the Info tab */
   private currentPhase: { name: string; description: string } | null = null
@@ -79,11 +80,17 @@ export class MobileTabController {
   }
 
   private onTouchStart = (e: TouchEvent): void => {
+    // Ignore touches on the Three.js canvas — let OrbitControls handle those
+    const target = e.target as HTMLElement
+    this.touchStartedOnCanvas = target.tagName === 'CANVAS'
     this.touchStartX = e.touches[0].clientX
     this.touchStartY = e.touches[0].clientY
   }
 
   private onTouchEnd = (e: TouchEvent): void => {
+    // Don't intercept swipes that started on the 3D canvas
+    if (this.touchStartedOnCanvas) return
+
     const dx = e.changedTouches[0].clientX - this.touchStartX
     const dy = e.changedTouches[0].clientY - this.touchStartY
 
