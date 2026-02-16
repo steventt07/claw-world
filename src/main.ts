@@ -63,11 +63,12 @@ import { checkForUpdates } from './ui/VersionChecker'
 import { drawMode } from './ui/DrawMode'
 import { setupTextLabelModal, showTextLabelModal } from './ui/TextLabelModal'
 import { showIntroCard, showSummaryCard } from './ui/DemoCards'
+import { initMobileTabController, type MobileTabController } from './ui/MobileTabController'
 import { StationLegend } from './ui/StationLegend'
 import { createSessionAPI, type SessionAPI, createHexArtAPI } from './api'
 import {
   startDemoMode, stopDemoMode, isDemoMode, isExplicitDemo, isReplayMode,
-  SCENARIO_META, fetchReplaySessions, createReplayBundle,
+  SCENARIO_META, createScenarioBundle, fetchReplaySessions, createReplayBundle,
   type DemoModeConfig, type DemoScenarioType, type ReplaySpeed,
 } from './demo'
 
@@ -172,6 +173,7 @@ const state: AppState = {
 
 // Station legend overlay for demo mode
 let stationLegend: StationLegend | null = null
+let mobileTabController: MobileTabController | null = null
 
 // Track pending zone hints for direction-aware placement
 // Maps managed session name → click position (used when zone is created)
@@ -1865,6 +1867,7 @@ function handleEvent(event: ClaudeEvent) {
   const eventColor = session?.color ?? 0x888888
   state.timelineManager?.add(event, eventColor)
   state.feedManager?.add(event, eventColor)
+  mobileTabController?.notifyFeedActivity()
 
   // Skip 3D scene updates for unlinked sessions
   if (!session) {
@@ -2609,6 +2612,8 @@ function makeDemoConfig(): DemoModeConfig {
         descEl.textContent = description
         phaseEl.classList.add('visible')
       }
+      // Update mobile tab controller
+      mobileTabController?.updatePhase(name, description)
     },
     showNarration: (text: string, duration?: number) => {
       const el = showToast(text, { type: 'info', icon: '\u{1F4D6}', duration: duration ?? 6000 })
@@ -2621,8 +2626,12 @@ function makeDemoConfig(): DemoModeConfig {
       if (progressEl && !progressEl.classList.contains('visible')) {
         progressEl.classList.add('visible')
       }
+      // Update mobile tab controller
+      mobileTabController?.updateProgress(percent)
     },
     showIntroCard: async (intro) => {
+      // Set education on mobile tab controller
+      mobileTabController?.setEducation({ intro, summary: { achievements: [] } })
       await showIntroCard(intro)
     },
     showSummaryCard: (summary) => {
@@ -2655,7 +2664,12 @@ function switchDemoScenario(type: DemoScenarioType): void {
   // Reset progress bar fill
   const fill = document.getElementById('demo-progress-fill')
   if (fill) fill.style.width = '0%'
-  startDemoMode(makeDemoConfig(), { explicit: true, scenarioType: type, skipIntro: true })
+  // Update mobile info tab with new scenario's education
+  const bundle = createScenarioBundle(type)
+  if (bundle.education) {
+    mobileTabController?.setEducation(bundle.education)
+  }
+  startDemoMode(makeDemoConfig(), { explicit: true, scenarioType: type, skipIntro: true, bundle })
   updateDemoBar(type)
 }
 
@@ -3188,6 +3202,9 @@ function init() {
     }
   })
 
+  // Initialize mobile tab controller early (before demo URL check needs it)
+  mobileTabController = initMobileTabController()
+
   // Check for ?demo= URL parameter (?demo=true defaults to swarm, ?demo=pair etc.)
   const urlParams = new URLSearchParams(window.location.search)
   const demoParam = urlParams.get('demo')
@@ -3196,7 +3213,12 @@ function init() {
     const scenarioType: DemoScenarioType = (validTypes as readonly string[]).includes(demoParam)
       ? (demoParam as DemoScenarioType)
       : 'swarm'
-    startDemoMode(makeDemoConfig(), { explicit: true, scenarioType })
+    // Set education on mobile tab controller for initial demo
+    const initialBundle = createScenarioBundle(scenarioType)
+    if (initialBundle.education) {
+      mobileTabController?.setEducation(initialBundle.education)
+    }
+    startDemoMode(makeDemoConfig(), { explicit: true, scenarioType, bundle: initialBundle })
     updateDemoBar(scenarioType)
   }
 
@@ -3605,6 +3627,11 @@ function init() {
   // Initialize station legend for demo mode
   stationLegend = new StationLegend()
   stationLegend.setScene(state.scene!)
+
+  // Initialize mobile tab controller (already initialized earlier, just set up switcher)
+  mobileTabController?.setScenarioSwitcher((type) => {
+    switchDemoScenario(type as DemoScenarioType)
+  })
 
   // L key toggles station legend during demo mode
   document.addEventListener('keydown', (e) => {
