@@ -23,6 +23,16 @@ import type {
   StopEvent,
   UserPromptSubmitEvent,
 } from '../../shared/types'
+import type {
+  ToolStartEvent,
+  ToolEndEvent,
+  AgentIdleEvent,
+  AgentThinkingEvent,
+  UserInputEvent,
+  AgentNotificationEvent,
+  SubagentSpawnEvent,
+  SubagentEndEvent,
+} from '../../shared/agent-protocol'
 import type { WorkshopScene } from '../scene/WorkshopScene'
 import type { FeedManager } from '../ui/FeedManager'
 import type { TimelineManager } from '../ui/TimelineManager'
@@ -69,14 +79,24 @@ export interface SessionContext {
   }
 }
 
-/** Event type to event data mapping */
+/** Event type to event data mapping (legacy Claude Code + universal types) */
 export interface EventTypeMap {
+  // Legacy Claude Code event types (backward compatible)
   'pre_tool_use': PreToolUseEvent
   'post_tool_use': PostToolUseEvent
   'stop': StopEvent
   'user_prompt_submit': UserPromptSubmitEvent
   'session_start': ClaudeEvent
   'notification': ClaudeEvent
+  // Universal agent protocol event types
+  'tool_start': ToolStartEvent
+  'tool_end': ToolEndEvent
+  'agent_idle': AgentIdleEvent
+  'agent_thinking': AgentThinkingEvent
+  'user_input': UserInputEvent
+  'agent_notification': AgentNotificationEvent
+  'subagent_spawn': SubagentSpawnEvent
+  'subagent_end': SubagentEndEvent
 }
 
 export type EventType = keyof EventTypeMap

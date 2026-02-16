@@ -20,6 +20,9 @@ import {
   type PreToolUseEvent,
   type PostToolUseEvent,
   type ManagedSession,
+  type HexArtDelta,
+  type HexArtState,
+  type PaintedHex,
 } from '../shared/types'
 import { soundManager } from './audio'
 
@@ -61,7 +64,7 @@ import { drawMode } from './ui/DrawMode'
 import { setupTextLabelModal, showTextLabelModal } from './ui/TextLabelModal'
 import { showIntroCard, showSummaryCard } from './ui/DemoCards'
 import { StationLegend } from './ui/StationLegend'
-import { createSessionAPI, type SessionAPI } from './api'
+import { createSessionAPI, type SessionAPI, createHexArtAPI } from './api'
 import {
   startDemoMode, stopDemoMode, isDemoMode, isExplicitDemo, isReplayMode,
   SCENARIO_META, fetchReplaySessions, createReplayBundle,
@@ -99,8 +102,9 @@ const API_URL = import.meta.env.DEV
   ? '/api'
   : `http://localhost:${AGENT_PORT}`
 
-// Create session API instance
+// Create API instances
 const sessionAPI = createSessionAPI(API_URL)
+const hexArtAPI = createHexArtAPI(API_URL)
 
 // ============================================================================
 // State
@@ -928,6 +932,59 @@ function setupContextMenu(): void {
 // Keyboard Shortcuts & Camera Modes
 // ============================================================================
 
+// ============================================================================
+// Hex Art Sync (delta batching + localStorage fallback)
+// ============================================================================
+
+/** localStorage fallback: debounced save for offline/disconnected use */
+let hexArtLocalSaveTimer: ReturnType<typeof setTimeout> | null = null
+function saveHexArtLocal(): void {
+  if (hexArtLocalSaveTimer) clearTimeout(hexArtLocalSaveTimer)
+  hexArtLocalSaveTimer = setTimeout(() => {
+    if (!state.scene) return
+    const hexes = state.scene.getPaintedHexes()
+    const zoneElevations = state.scene.getZoneElevations()
+    localStorage.setItem('vibecraft2-hexart', JSON.stringify(hexes))
+    localStorage.setItem('vibecraft2-zone-elevations', JSON.stringify(zoneElevations))
+  }, 1000)
+}
+
+/** Delta batching for hex art server sync (50ms window) */
+let pendingDelta: HexArtDelta = {}
+let deltaFlushTimer: ReturnType<typeof setTimeout> | null = null
+
+function queueHexArtDelta(delta: HexArtDelta): void {
+  if (delta.painted) {
+    if (!pendingDelta.painted) pendingDelta.painted = []
+    pendingDelta.painted.push(...delta.painted)
+  }
+  if (delta.erased) {
+    if (!pendingDelta.erased) pendingDelta.erased = []
+    pendingDelta.erased.push(...delta.erased)
+  }
+  if (delta.zoneElevations) {
+    if (!pendingDelta.zoneElevations) pendingDelta.zoneElevations = {}
+    Object.assign(pendingDelta.zoneElevations, delta.zoneElevations)
+  }
+
+  if (!deltaFlushTimer) {
+    deltaFlushTimer = setTimeout(flushHexArtDelta, 50)
+  }
+}
+
+function flushHexArtDelta(): void {
+  deltaFlushTimer = null
+  const delta = pendingDelta
+  pendingDelta = {}
+
+  const hasContent = (delta.painted && delta.painted.length > 0) ||
+                     (delta.erased && delta.erased.length > 0) ||
+                     (delta.zoneElevations && Object.keys(delta.zoneElevations).length > 0)
+  if (hasContent && state.client) {
+    state.client.sendHexArtDelta(delta)
+  }
+}
+
 /**
  * Setup click handler to focus session when clicking on Claude
  */
@@ -945,21 +1002,6 @@ function setupClickToPrompt(): void {
   let isDrawModeDragging = false
   const paintedThisDrag = new Set<string>()  // Track hexes painted during current drag
 
-  // Debounced save for hex art persistence (includes zone elevations)
-  let hexArtSaveTimer: ReturnType<typeof setTimeout> | null = null
-  const saveHexArt = () => {
-    if (hexArtSaveTimer) clearTimeout(hexArtSaveTimer)
-    hexArtSaveTimer = setTimeout(() => {
-      if (!state.scene) return
-      const hexes = state.scene.getPaintedHexes()
-      const zoneElevations = state.scene.getZoneElevations()
-      localStorage.setItem('vibecraft2-hexart', JSON.stringify(hexes))
-      localStorage.setItem('vibecraft2-zone-elevations', JSON.stringify(zoneElevations))
-      const elevCount = Object.keys(zoneElevations).length
-      console.log(`Saved ${hexes.length} painted hexes and ${elevCount} zone elevations to localStorage`)
-    }, 500)  // Debounce 500ms
-  }
-
   // Helper to paint with brush size
   const paintWithBrush = (centerHex: { q: number; r: number }, playSound: boolean) => {
     if (!state.scene) return
@@ -969,14 +1011,23 @@ function setupClickToPrompt(): void {
     const hexesToPaint = state.scene.hexGrid.getHexesInRadius(centerHex, brushSize)
 
     let anyPainted = false
+    const paintedBatch: PaintedHex[] = []
+    const erasedBatch: Array<{ q: number; r: number }> = []
+
     for (const hex of hexesToPaint) {
       const hexKey = `${hex.q},${hex.r}`
       if (!paintedThisDrag.has(hexKey)) {
         paintedThisDrag.add(hexKey)
         if (color === null) {
           state.scene.clearPaintedHex(hex)
+          erasedBatch.push({ q: hex.q, r: hex.r })
         } else {
           state.scene.paintHex(hex, color)
+          // Get resulting state after paint for the delta
+          const result = state.scene.getPaintedHexAt(hex)
+          if (result) {
+            paintedBatch.push(result)
+          }
         }
         anyPainted = true
       }
@@ -986,9 +1037,13 @@ function setupClickToPrompt(): void {
       soundManager.play('click')
     }
 
-    // Save to localStorage (debounced)
+    // Queue delta for server sync (batched 50ms) + localStorage fallback
     if (anyPainted) {
-      saveHexArt()
+      const delta: HexArtDelta = {}
+      if (paintedBatch.length > 0) delta.painted = paintedBatch
+      if (erasedBatch.length > 0) delta.erased = erasedBatch
+      queueHexArtDelta(delta)
+      saveHexArtLocal()
     }
   }
 
@@ -2321,10 +2376,13 @@ function setupSettingsModal(): void {
   // Wire up draw mode clear callback
   drawMode.onClear(() => {
     state.scene?.clearAllPaintedHexes()
-    // Clear from localStorage too
+    // Clear on server (broadcasts empty state to all clients)
+    hexArtAPI.clearHexArt().then(ok => {
+      if (ok) console.log('Cleared hex art on server')
+    })
+    // Also clear localStorage fallback
     localStorage.removeItem('vibecraft2-hexart')
     localStorage.removeItem('vibecraft2-zone-elevations')
-    console.log('Cleared hex art and zone elevations from localStorage')
   })
 
   // Port input
@@ -3062,25 +3120,24 @@ function init() {
     }
   }, 100)
 
-  // Load saved hex art from localStorage
+  // Hex art is primarily loaded from server via WebSocket hexart_state message (see onRawMessage handler).
+  // localStorage is loaded as immediate fallback until server state arrives.
   const savedHexArt = localStorage.getItem('vibecraft2-hexart')
   if (savedHexArt) {
     try {
       const hexes = JSON.parse(savedHexArt)
       state.scene.loadPaintedHexes(hexes)
-      console.log(`Loaded ${hexes.length} painted hexes from localStorage`)
+      console.log(`Loaded ${hexes.length} painted hexes from localStorage (fallback, server state will override)`)
     } catch (e) {
       console.warn('Failed to load hex art from localStorage:', e)
     }
   }
-
-  // Load saved zone elevations from localStorage
   const savedZoneElevations = localStorage.getItem('vibecraft2-zone-elevations')
   if (savedZoneElevations) {
     try {
       const elevations = JSON.parse(savedZoneElevations)
       state.scene.loadZoneElevations(elevations)
-      console.log(`Loaded ${Object.keys(elevations).length} zone elevations from localStorage`)
+      console.log(`Loaded ${Object.keys(elevations).length} zone elevations from localStorage (fallback)`)
     } catch (e) {
       console.warn('Failed to load zone elevations from localStorage:', e)
     }
@@ -3373,6 +3430,70 @@ function init() {
       if (state.scene) {
         state.scene.setTextTiles(tiles)
       }
+    } else if (message.type === 'hexart_state') {
+      // Full hex art state from server (on connect or after clear/upload)
+      const serverState = message.payload as HexArtState
+      if (state.scene) {
+        // Migration: if server state is empty but localStorage has data, upload it
+        const localHexArt = localStorage.getItem('vibecraft2-hexart')
+        const localElevations = localStorage.getItem('vibecraft2-zone-elevations')
+        if (serverState.hexes.length === 0 && !Object.keys(serverState.zoneElevations).length && localHexArt) {
+          try {
+            const hexes = JSON.parse(localHexArt)
+            const zoneElevations = localElevations ? JSON.parse(localElevations) : {}
+            if (hexes.length > 0 || Object.keys(zoneElevations).length > 0) {
+              console.log(`Migrating ${hexes.length} hexes from localStorage to server...`)
+              hexArtAPI.uploadHexArt({ hexes, zoneElevations }).then(ok => {
+                if (ok) {
+                  localStorage.removeItem('vibecraft2-hexart')
+                  localStorage.removeItem('vibecraft2-zone-elevations')
+                  console.log('Migration complete, localStorage cleaned up')
+                }
+              })
+              // Load the local data immediately while migration uploads
+              state.scene.loadPaintedHexes(hexes)
+              state.scene.loadZoneElevations(zoneElevations)
+              return
+            }
+          } catch (e) {
+            console.warn('Failed to migrate hex art from localStorage:', e)
+          }
+        }
+
+        // Clean up localStorage if server has data (migration already done)
+        if (serverState.hexes.length > 0 || Object.keys(serverState.zoneElevations).length > 0) {
+          localStorage.removeItem('vibecraft2-hexart')
+          localStorage.removeItem('vibecraft2-zone-elevations')
+        }
+
+        // Load from server
+        state.scene.loadPaintedHexes(serverState.hexes)
+        state.scene.loadZoneElevations(serverState.zoneElevations)
+        console.log(`Loaded hex art from server: ${serverState.hexes.length} hexes, ${Object.keys(serverState.zoneElevations).length} elevations`)
+      }
+    } else if (message.type === 'hexart_delta') {
+      // Incremental hex art update from another client
+      const delta = message.payload as HexArtDelta
+      if (state.scene) {
+        // Apply painted hexes
+        if (delta.painted) {
+          for (const hex of delta.painted) {
+            state.scene.setPaintedHex(hex)
+          }
+        }
+        // Apply erased hexes
+        if (delta.erased) {
+          for (const hex of delta.erased) {
+            state.scene.clearPaintedHex(hex)
+          }
+        }
+        // Apply zone elevations
+        if (delta.zoneElevations) {
+          for (const [sessionId, elevation] of Object.entries(delta.zoneElevations)) {
+            state.scene.setZoneElevation(sessionId, elevation)
+          }
+        }
+      }
     }
   })
 
@@ -3422,6 +3543,12 @@ function init() {
       // The base station Y is 0.3 (from createZoneStations), so add that offset
       const stationYOffset = 0.3
       session.claude.mesh.position.y = elevation + stationYOffset
+    }
+
+    // If in draw mode, sync zone elevation change to server + localStorage
+    if (drawMode.isEnabled()) {
+      queueHexArtDelta({ zoneElevations: { [sessionId]: elevation } })
+      saveHexArtLocal()
     }
   })
 

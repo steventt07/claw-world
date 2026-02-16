@@ -4,11 +4,16 @@
  * Registers sound effects for various events.
  * These run via the EventBus, decoupled from main event handling.
  * Includes spatial audio positioning based on session/zone.
+ *
+ * Supports both legacy Claude Code events and universal agent protocol events.
+ * Universal events use category-based sound mapping from CATEGORY_SOUND_MAP.
  */
 
 import { eventBus } from '../EventBus'
 import { soundManager, type SoundPlayOptions } from '../../audio'
 import type { PreToolUseEvent, PostToolUseEvent, BashToolInput } from '../../../shared/types'
+import type { ToolStartEvent, ToolEndEvent } from '../../../shared/agent-protocol'
+import { CATEGORY_SOUND_MAP } from '../../../shared/agent-protocol'
 
 /**
  * Check if a Bash command is a git commit
@@ -33,6 +38,8 @@ function getSpatialOptions(ctx: { session: { id: string } | null }): SoundPlayOp
  * Register all sound-related event handlers
  */
 export function registerSoundHandlers(): void {
+  // ---- Legacy Claude Code events ----
+
   // Tool start sounds (with special handling for git commit)
   eventBus.on('pre_tool_use', (event: PreToolUseEvent, ctx) => {
     if (!ctx.soundEnabled) return
@@ -93,5 +100,67 @@ export function registerSoundHandlers(): void {
   eventBus.on('notification', (_event, ctx) => {
     if (!ctx.soundEnabled) return
     soundManager.play('notification')  // Global sound, no spatial
+  })
+
+  // ---- Universal agent protocol events ----
+
+  // Tool start sound (category-based)
+  eventBus.on('tool_start', (event: ToolStartEvent, ctx) => {
+    if (!ctx.soundEnabled) return
+    const spatial = getSpatialOptions(ctx)
+
+    // Special sound for git commit in execute category
+    if (event.tool.category === 'execute' && event.input?.command) {
+      const cmd = event.input.command as string
+      if (isGitCommit(cmd)) {
+        soundManager.play('git_commit')
+        return
+      }
+    }
+
+    // Play category-based sound
+    const soundName = CATEGORY_SOUND_MAP[event.tool.category]
+    if (soundName) {
+      soundManager.play(soundName as any, spatial)
+    }
+  })
+
+  // Subagent spawn sound (delegate category)
+  eventBus.on('tool_start', (event: ToolStartEvent, ctx) => {
+    if (!ctx.soundEnabled) return
+    if (event.tool.category === 'delegate') {
+      const spatial = getSpatialOptions(ctx)
+      soundManager.play('spawn', spatial)
+    }
+  })
+
+  // Tool end sound (universal)
+  eventBus.on('tool_end', (event: ToolEndEvent, ctx) => {
+    if (!ctx.soundEnabled) return
+    const spatial = getSpatialOptions(ctx)
+    soundManager.playResult(event.success, spatial)
+  })
+
+  // Subagent despawn sound (delegate category end)
+  eventBus.on('tool_end', (event: ToolEndEvent, ctx) => {
+    if (!ctx.soundEnabled) return
+    if (event.tool.category === 'delegate') {
+      const spatial = getSpatialOptions(ctx)
+      soundManager.play('despawn', spatial)
+    }
+  })
+
+  // Agent idle sound (universal)
+  eventBus.on('agent_idle', (_event, ctx) => {
+    if (!ctx.soundEnabled) return
+    const spatial = getSpatialOptions(ctx)
+    soundManager.play('stop', spatial)
+  })
+
+  // User input sound (universal)
+  eventBus.on('user_input', (_event, ctx) => {
+    if (!ctx.soundEnabled) return
+    const spatial = getSpatialOptions(ctx)
+    soundManager.play('prompt', spatial)
   })
 }

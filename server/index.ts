@@ -35,8 +35,13 @@ import type {
   CreateTextTileRequest,
   UpdateTextTileRequest,
   ReplaySessionSummary,
+  HexArtState,
+  HexArtDelta,
+  PaintedHex,
 } from '../shared/types.js'
 import { DEFAULTS } from '../shared/defaults.js'
+import type { UniversalEvent, AgentRegistration, RegisteredAgent } from '../shared/agent-protocol.js'
+import { normalizeEvent } from '../shared/adapters/index.js'
 import { GitStatusManager } from './GitStatusManager.js'
 import { ProjectsManager } from './ProjectsManager.js'
 import { fileURLToPath } from 'url'
@@ -89,6 +94,7 @@ const DEBUG = process.env.VIBECRAFT2_DEBUG === 'true'
 const TMUX_SESSION = process.env.VIBECRAFT2_TMUX_SESSION ?? DEFAULTS.TMUX_SESSION
 const SESSIONS_FILE = resolve(expandHome(process.env.VIBECRAFT2_SESSIONS_FILE ?? DEFAULTS.SESSIONS_FILE))
 const TILES_FILE = resolve(expandHome(process.env.VIBECRAFT2_TILES_FILE ?? '~/.vibecraft2/data/tiles.json'))
+const HEXART_FILE = resolve(expandHome(process.env.VIBECRAFT2_HEXART_FILE ?? '~/.vibecraft2/data/hexart.json'))
 
 /** Time before a "working" session auto-transitions to idle (failsafe for missed events) */
 const WORKING_TIMEOUT_MS = 120_000 // 2 minutes
@@ -302,6 +308,18 @@ const managedSessions = new Map<string, ManagedSession>()
 
 /** Text tiles (grid labels) */
 const textTiles = new Map<string, TextTile>()
+
+/** Hex art state (collaborative canvas) */
+let hexArtState: HexArtState = { hexes: [], zoneElevations: {} }
+
+/** Debounce timer for hex art save */
+let hexArtSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+/** Registered agents (from v2 API) */
+const registeredAgents = new Map<string, RegisteredAgent>()
+
+/** Universal events in memory (alongside legacy ClaudeEvent[] for backward compat) */
+const universalEvents: UniversalEvent[] = []
 
 /** Git status tracker for managed sessions */
 const gitStatusManager = new GitStatusManager()
@@ -1134,6 +1152,98 @@ function broadcastTiles(): void {
 }
 
 // ============================================================================
+// Hex Art (Collaborative Canvas)
+// ============================================================================
+
+/**
+ * Save hex art state to disk (debounced 500ms)
+ */
+function saveHexArt(): void {
+  if (hexArtSaveTimer) clearTimeout(hexArtSaveTimer)
+  hexArtSaveTimer = setTimeout(() => {
+    try {
+      writeFileSync(HEXART_FILE, JSON.stringify(hexArtState, null, 2))
+      debug(`Saved hex art: ${hexArtState.hexes.length} hexes, ${Object.keys(hexArtState.zoneElevations).length} elevations`)
+    } catch (e) {
+      console.error('Failed to save hex art:', e)
+    }
+  }, 500)
+}
+
+/**
+ * Load hex art state from disk
+ */
+function loadHexArt(): void {
+  if (!existsSync(HEXART_FILE)) {
+    debug('No saved hex art file found')
+    return
+  }
+
+  try {
+    const content = readFileSync(HEXART_FILE, 'utf-8')
+    const data = JSON.parse(content) as HexArtState
+    hexArtState = {
+      hexes: Array.isArray(data.hexes) ? data.hexes : [],
+      zoneElevations: data.zoneElevations || {},
+    }
+    log(`Loaded hex art: ${hexArtState.hexes.length} hexes, ${Object.keys(hexArtState.zoneElevations).length} elevations`)
+  } catch (e) {
+    console.error('Failed to load hex art:', e)
+  }
+}
+
+/**
+ * Apply an incremental hex art delta to the in-memory state
+ */
+function applyHexArtDelta(delta: HexArtDelta): void {
+  // Build a lookup map for fast upserts
+  const hexMap = new Map<string, PaintedHex>()
+  for (const hex of hexArtState.hexes) {
+    hexMap.set(`${hex.q},${hex.r}`, hex)
+  }
+
+  // Upsert painted hexes
+  if (delta.painted) {
+    for (const hex of delta.painted) {
+      hexMap.set(`${hex.q},${hex.r}`, hex)
+    }
+  }
+
+  // Remove erased hexes
+  if (delta.erased) {
+    for (const hex of delta.erased) {
+      hexMap.delete(`${hex.q},${hex.r}`)
+    }
+  }
+
+  // Merge zone elevations
+  if (delta.zoneElevations) {
+    for (const [sessionId, elevation] of Object.entries(delta.zoneElevations)) {
+      if (elevation <= 0) {
+        delete hexArtState.zoneElevations[sessionId]
+      } else {
+        hexArtState.zoneElevations[sessionId] = elevation
+      }
+    }
+  }
+
+  // Rebuild hexes array from map
+  hexArtState.hexes = Array.from(hexMap.values())
+}
+
+/**
+ * Broadcast a hex art delta to all clients except the sender
+ */
+function broadcastHexArtDelta(delta: HexArtDelta, excludeWs?: WebSocket): void {
+  const data = JSON.stringify({ type: 'hexart_delta', payload: delta } as ServerMessage)
+  for (const client of clients) {
+    if (client !== excludeWs && client.readyState === WebSocket.OPEN) {
+      client.send(data)
+    }
+  }
+}
+
+// ============================================================================
 // Voice Transcription (Deepgram)
 // ============================================================================
 
@@ -1345,6 +1455,116 @@ function addEvent(event: ClaudeEvent) {
   broadcast({ type: 'event', payload: processed })
 }
 
+/**
+ * Add a universal event from the v2 API.
+ * Converts to a ClaudeEvent-compatible format for backward compatibility
+ * with existing client-side handlers, then broadcasts.
+ */
+function addUniversalEvent(event: UniversalEvent): void {
+  // Store in universal events list
+  universalEvents.push(event)
+  if (universalEvents.length > MAX_EVENTS) {
+    universalEvents.splice(0, universalEvents.length - MAX_EVENTS)
+  }
+
+  // Convert to ClaudeEvent format for backward-compatible broadcast.
+  // This allows existing client handlers to process universal events
+  // without modification until the client is fully migrated.
+  const claudeEvent = universalToClaudeEvent(event)
+  if (claudeEvent) {
+    addEvent(claudeEvent)
+  }
+
+  // Also handle _alsoEmit metadata (for compound events like Task → spawn + tool_start)
+  const alsoEmit = event.metadata?._alsoEmit as UniversalEvent | undefined
+  if (alsoEmit) {
+    const alsoClaudeEvent = universalToClaudeEvent(alsoEmit)
+    if (alsoClaudeEvent) {
+      addEvent(alsoClaudeEvent)
+    }
+  }
+}
+
+/**
+ * Convert a UniversalEvent back to ClaudeEvent format for backward compatibility.
+ * This is a lossy conversion but preserves enough for existing handlers.
+ */
+function universalToClaudeEvent(event: UniversalEvent): ClaudeEvent | null {
+  const base = {
+    id: event.id,
+    timestamp: event.timestamp,
+    sessionId: event.agentId,
+    cwd: event.cwd || '',
+  }
+
+  switch (event.type) {
+    case 'tool_start':
+      return {
+        ...base,
+        type: 'pre_tool_use' as const,
+        tool: event.tool.name,
+        toolInput: event.input || {},
+        toolUseId: event.tool.id,
+      }
+
+    case 'tool_end':
+      return {
+        ...base,
+        type: 'post_tool_use' as const,
+        tool: event.tool.name,
+        toolInput: {},
+        toolResponse: event.output || {},
+        toolUseId: event.tool.id,
+        success: event.success,
+        duration: event.duration,
+      }
+
+    case 'agent_idle':
+      return {
+        ...base,
+        type: 'stop' as const,
+        stopHookActive: false,
+        response: event.response,
+      }
+
+    case 'agent_start': {
+      const triggerToSource: Record<string, 'startup' | 'resume' | 'clear' | 'compact'> = {
+        startup: 'startup', resume: 'resume', user_input: 'startup', other: 'startup',
+      }
+      return {
+        ...base,
+        type: 'session_start' as const,
+        source: triggerToSource[event.trigger || 'startup'] || 'startup',
+      }
+    }
+
+    case 'agent_end':
+      return {
+        ...base,
+        type: 'session_end' as const,
+        reason: (event.reason as 'clear' | 'logout' | 'prompt_input_exit' | 'other') || 'other',
+      }
+
+    case 'user_input':
+      return {
+        ...base,
+        type: 'user_prompt_submit' as const,
+        prompt: event.text,
+      }
+
+    case 'notification':
+      return {
+        ...base,
+        type: 'notification' as const,
+        message: event.message,
+        notificationType: event.level || 'info',
+      }
+
+    default:
+      return null
+  }
+}
+
 // ============================================================================
 // File Watching
 // ============================================================================
@@ -1465,6 +1685,15 @@ function handleClientMessage(ws: WebSocket, message: ClientMessage) {
       break
     }
 
+    case 'hexart_delta': {
+      const delta = message.payload as HexArtDelta
+      applyHexArtDelta(delta)
+      saveHexArt()
+      broadcastHexArtDelta(delta, ws)
+      debug(`Hex art delta: ${delta.painted?.length ?? 0} painted, ${delta.erased?.length ?? 0} erased`)
+      break
+    }
+
     default:
       debug(`Unknown message type: ${(message as { type: string }).type}`)
   }
@@ -1499,9 +1728,31 @@ function handleHttpRequest(req: IncomingMessage, res: ServerResponse) {
   if (req.method === 'POST' && req.url === '/event') {
     collectRequestBody(req).then(body => {
       try {
-        const event = JSON.parse(body) as ClaudeEvent
-        addEvent(event)
-        debug(`Received event via HTTP: ${event.type}`)
+        const raw = JSON.parse(body) as Record<string, unknown>
+
+        // Auto-detect format: try adapter normalization first for universal events,
+        // then fall back to treating as Claude Code event (existing behavior).
+        // Claude Code events have 'sessionId' and known types, so the adapter will
+        // handle them. Events already in universal format are also handled.
+        if (raw.sessionId || raw.type === 'pre_tool_use' || raw.type === 'post_tool_use') {
+          // Claude Code format - use existing handler for maximum backward compatibility
+          const event = raw as unknown as ClaudeEvent
+          addEvent(event)
+          debug(`Received event via HTTP: ${event.type}`)
+        } else {
+          // Try universal format via adapter system
+          const normalized = normalizeEvent(raw)
+          if (normalized) {
+            addUniversalEvent(normalized)
+            debug(`Received universal event via HTTP: ${normalized.type}`)
+          } else {
+            // Last resort: treat as Claude event
+            const event = raw as unknown as ClaudeEvent
+            addEvent(event)
+            debug(`Received unrecognized event via HTTP, passed through: ${event.type}`)
+          }
+        }
+
         res.writeHead(200, { 'Content-Type': 'application/json' })
         res.end(JSON.stringify({ ok: true }))
       } catch (e) {
@@ -2220,6 +2471,153 @@ function handleHttpRequest(req: IncomingMessage, res: ServerResponse) {
     }
   }
 
+  // -------------------------------------------------------------------------
+  // Hex Art API (Collaborative Canvas)
+  // -------------------------------------------------------------------------
+
+  // GET /hexart — Get full hex art state
+  if (req.method === 'GET' && req.url === '/hexart') {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ ok: true, ...hexArtState }))
+    return
+  }
+
+  // POST /hexart — Full state replacement (for migration from localStorage)
+  if (req.method === 'POST' && req.url === '/hexart') {
+    collectRequestBody(req).then(body => {
+      try {
+        const data = JSON.parse(body) as HexArtState
+        hexArtState = {
+          hexes: Array.isArray(data.hexes) ? data.hexes : [],
+          zoneElevations: data.zoneElevations || {},
+        }
+        saveHexArt()
+
+        // Broadcast full state to all clients
+        const msg: ServerMessage = { type: 'hexart_state', payload: hexArtState }
+        const msgStr = JSON.stringify(msg)
+        for (const client of clients) {
+          if (client.readyState === WebSocket.OPEN) {
+            client.send(msgStr)
+          }
+        }
+
+        log(`Hex art uploaded: ${hexArtState.hexes.length} hexes, ${Object.keys(hexArtState.zoneElevations).length} elevations`)
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: true }))
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }))
+      }
+    }).catch(() => {
+      res.writeHead(413, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Request body too large' }))
+    })
+    return
+  }
+
+  // DELETE /hexart — Clear all hex art
+  if (req.method === 'DELETE' && req.url === '/hexart') {
+    hexArtState = { hexes: [], zoneElevations: {} }
+    saveHexArt()
+
+    // Broadcast empty state to all clients
+    const msg: ServerMessage = { type: 'hexart_state', payload: hexArtState }
+    const msgStr = JSON.stringify(msg)
+    for (const client of clients) {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(msgStr)
+      }
+    }
+
+    log('Hex art cleared')
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({ ok: true }))
+    return
+  }
+
+  // =========================================================================
+  // Universal Agent Protocol (v2 API)
+  // =========================================================================
+
+  // POST /v2/agents/register — Register a new agent
+  if (req.method === 'POST' && req.url === '/v2/agents/register') {
+    collectRequestBody(req).then(body => {
+      try {
+        const registration = JSON.parse(body) as AgentRegistration
+        if (!registration.name || !registration.framework) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ ok: false, error: 'name and framework are required' }))
+          return
+        }
+
+        const agentId = randomUUID()
+        const agent: RegisteredAgent = {
+          ...registration,
+          agentId,
+          registeredAt: Date.now(),
+        }
+        registeredAgents.set(agentId, agent)
+
+        log(`Agent registered: ${agent.name} (${agent.framework}) -> ${agentId.slice(0, 8)}`)
+
+        res.writeHead(201, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: true, agent }))
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }))
+      }
+    }).catch(() => {
+      res.writeHead(413, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Request body too large' }))
+    })
+    return
+  }
+
+  // GET /v2/agents — List registered agents
+  if (req.method === 'GET' && req.url === '/v2/agents') {
+    res.writeHead(200, { 'Content-Type': 'application/json' })
+    res.end(JSON.stringify({
+      ok: true,
+      agents: Array.from(registeredAgents.values()),
+    }))
+    return
+  }
+
+  // POST /v2/event — Accept pre-normalized universal events
+  if (req.method === 'POST' && req.url === '/v2/event') {
+    collectRequestBody(req).then(body => {
+      try {
+        const raw = JSON.parse(body) as Record<string, unknown>
+
+        // Auto-fill id and timestamp if missing
+        if (!raw.id) raw.id = randomUUID()
+        if (!raw.timestamp) raw.timestamp = Date.now()
+
+        // Normalize through adapter system (generic adapter handles universal format)
+        const normalized = normalizeEvent(raw)
+        if (!normalized) {
+          res.writeHead(400, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ ok: false, error: 'Unrecognized event format' }))
+          return
+        }
+
+        addUniversalEvent(normalized)
+        debug(`Received v2 event: ${normalized.type} from ${normalized.source}`)
+
+        res.writeHead(200, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: true }))
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ ok: false, error: 'Invalid JSON' }))
+      }
+    }).catch(() => {
+      res.writeHead(413, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ error: 'Request body too large' }))
+    })
+    return
+  }
+
   // Static file serving for frontend (production mode)
   serveStaticFile(req, res)
 }
@@ -2311,6 +2709,9 @@ function main() {
   // Load saved text tiles
   loadTiles()
 
+  // Load saved hex art
+  loadHexArt()
+
   // Start git status tracking
   gitStatusManager.setUpdateHandler(({ sessionId, status }) => {
     const session = managedSessions.get(sessionId)
@@ -2363,6 +2764,13 @@ function main() {
       payload: getTiles(),
     }
     ws.send(JSON.stringify(tilesMsg))
+
+    // Send hex art state
+    const hexartMsg: ServerMessage = {
+      type: 'hexart_state',
+      payload: hexArtState,
+    }
+    ws.send(JSON.stringify(hexartMsg))
 
     // Send recent history - filtered to only include events from current managed sessions
     const activeClaudeSessionIds = new Set(
@@ -2421,6 +2829,12 @@ function main() {
     log(`  Health: http://localhost:${PORT}/health`)
     log(`  Stats: http://localhost:${PORT}/stats`)
     log(`  Sessions: http://localhost:${PORT}/sessions`)
+    log(`  Hex Art: http://localhost:${PORT}/hexart`)
+    log(``)
+    log(`Universal Agent Protocol (v2):`)
+    log(`  Register: POST http://localhost:${PORT}/v2/agents/register`)
+    log(`  Events:   POST http://localhost:${PORT}/v2/event`)
+    log(`  Agents:   GET  http://localhost:${PORT}/v2/agents`)
 
     // Start token polling after server is ready
     startTokenPolling()

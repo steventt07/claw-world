@@ -2,7 +2,7 @@
  * EventClient - WebSocket client for receiving Claude Code events
  */
 
-import type { ClaudeEvent, ServerMessage, ClientMessage, ManagedSession } from '../../shared/types'
+import type { ClaudeEvent, ServerMessage, ClientMessage, ManagedSession, HexArtDelta } from '../../shared/types'
 
 export type EventHandler = (event: ClaudeEvent) => void
 export type HistoryHandler = (events: ClaudeEvent[]) => void
@@ -295,5 +295,10 @@ export class EventClient {
 
   requestHistory(limit = 100): void {
     this.send({ type: 'get_history', payload: { limit } })
+  }
+
+  /** Send a hex art delta to the server for broadcast to other clients */
+  sendHexArtDelta(delta: HexArtDelta): void {
+    this.send({ type: 'hexart_delta', payload: delta })
   }
 }

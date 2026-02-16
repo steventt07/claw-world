@@ -5,7 +5,37 @@
  * - Hook scripts (produce events)
  * - WebSocket server (relay events)
  * - Three.js client (consume events)
+ *
+ * For the agent-agnostic universal protocol, see ./agent-protocol.ts
  */
+
+// Re-export universal agent protocol types for convenience
+export type {
+  AgentEventType,
+  ToolCategory,
+  AgentEvent,
+  ToolInfo,
+  ToolStartEvent,
+  ToolEndEvent,
+  AgentIdleEvent,
+  AgentThinkingEvent,
+  AgentStartEvent,
+  AgentEndEvent,
+  UserInputEvent,
+  AgentNotificationEvent,
+  SubagentSpawnEvent,
+  SubagentEndEvent,
+  UniversalEvent,
+  AgentRegistration,
+  RegisteredAgent,
+} from './agent-protocol.js'
+
+export {
+  CATEGORY_STATION_MAP,
+  CATEGORY_SOUND_MAP,
+  CATEGORY_ICON_MAP,
+  getStationForCategory,
+} from './agent-protocol.js'
 
 // ============================================================================
 // Core Event Types
@@ -166,6 +196,8 @@ export type ServerMessage =
   | { type: 'permission_prompt'; payload: { sessionId: string; tool: string; context: string; options: PermissionOption[] } }
   | { type: 'permission_resolved'; payload: { sessionId: string } }
   | { type: 'text_tiles'; payload: TextTile[] }
+  | { type: 'hexart_state'; payload: HexArtState }
+  | { type: 'hexart_delta'; payload: HexArtDelta }
 
 /** Client -> Server messages */
 export type ClientMessage =
@@ -175,6 +207,7 @@ export type ClientMessage =
   | { type: 'voice_start' }
   | { type: 'voice_stop' }
   | { type: 'permission_response'; payload: { sessionId: string; response: string } }
+  | { type: 'hexart_delta'; payload: HexArtDelta }
 
 // ============================================================================
 // Visualization State
@@ -426,6 +459,31 @@ export interface UpdateTextTileRequest {
     r: number
   }
   color?: string
+}
+
+// ============================================================================
+// Hex Art (Collaborative Canvas)
+// ============================================================================
+
+/** A single painted hex on the canvas */
+export interface PaintedHex {
+  q: number
+  r: number
+  color: number
+  height: number
+}
+
+/** Full hex art state (for initial sync and migration) */
+export interface HexArtState {
+  hexes: PaintedHex[]
+  zoneElevations: Record<string, number>
+}
+
+/** Incremental hex art delta (for real-time sync) */
+export interface HexArtDelta {
+  painted?: PaintedHex[]
+  erased?: Array<{ q: number; r: number }>
+  zoneElevations?: Record<string, number>
 }
 
 // ============================================================================

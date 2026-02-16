@@ -3320,6 +3320,72 @@ export class WorkshopScene {
   }
 
   /**
+   * Get painted hex data at a specific position (for delta sync)
+   */
+  getPaintedHexAt(hex: { q: number; r: number }): { q: number; r: number; color: number; height: number } | null {
+    const key = `${hex.q},${hex.r}`
+    const data = this.paintedHexes.get(key)
+    if (!data) return null
+    return { q: hex.q, r: hex.r, color: data.color, height: data.height }
+  }
+
+  /**
+   * Set a painted hex to an exact state (for receiving remote deltas).
+   * Removes existing mesh if present, creates new mesh at specified height/color.
+   */
+  setPaintedHex(hex: { q: number; r: number; color: number; height: number }): void {
+    const key = `${hex.q},${hex.r}`
+    const existing = this.paintedHexes.get(key)
+
+    // Remove old mesh if present
+    if (existing) {
+      this.scene.remove(existing.mesh)
+      existing.mesh.geometry.dispose()
+      ;(existing.mesh.material as THREE.MeshStandardMaterial).dispose()
+    }
+
+    // Create filled hex mesh (same logic as paintHex)
+    const { x, z } = this.hexGrid.axialToCartesian(hex)
+    const hexRadius = this.hexGrid.hexRadius * 0.95
+
+    const shape = new THREE.Shape()
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i - Math.PI / 2
+      const px = hexRadius * Math.cos(angle)
+      const py = hexRadius * Math.sin(angle)
+      if (i === 0) {
+        shape.moveTo(px, py)
+      } else {
+        shape.lineTo(px, py)
+      }
+    }
+    shape.closePath()
+
+    const geometry = new THREE.ExtrudeGeometry(shape, {
+      depth: hex.height,
+      bevelEnabled: false,
+    })
+
+    const material = new THREE.MeshStandardMaterial({
+      color: hex.color,
+      emissive: hex.color,
+      emissiveIntensity: 0.25,
+      roughness: 0.4,
+      metalness: 0.3,
+    })
+
+    const mesh = new THREE.Mesh(geometry, material)
+    mesh.rotation.x = -Math.PI / 2
+    mesh.position.set(x, 0.02, z)
+
+    this.scene.add(mesh)
+    this.paintedHexes.set(key, { mesh, height: hex.height, color: hex.color })
+
+    // Update any text tile at this position
+    this.updateTextTileAtHex(hex)
+  }
+
+  /**
    * Load painted hexes (for persistence)
    */
   loadPaintedHexes(hexes: Array<{ q: number; r: number; color: number; height?: number }>): void {
@@ -3365,9 +3431,9 @@ export class WorkshopScene {
   }
 
   /**
-   * Set a zone's elevation directly (no animation, for loading saved state)
+   * Set a zone's elevation directly (no animation, for loading saved state or remote sync)
    */
-  private setZoneElevation(sessionId: string, elevation: number): void {
+  setZoneElevation(sessionId: string, elevation: number): void {
     const zone = this.zones.get(sessionId)
     if (!zone) return
 
